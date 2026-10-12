@@ -65,6 +65,27 @@ class RoutingMiddlewareTests(unittest.TestCase):
         self.assertFalse(self.decisions[0]["pinned"])
         self.assertEqual(result["request"]["model"], "moonshotai/kimi-k3")
 
+    def test_custom_endpoint_bare_id_matches_vendor_qualified_default(self):
+        plugin._on_pre_llm_call(session_id="custom-default", turn_id="t1", user_message=HARD)
+        with mock.patch.object(plugin.route, "load_config", return_value={"provider_aliases": {"custom": "tokenharbor"}}):
+            plugin._on_llm_request(request={"model": "deepseek-v4.1-flash", "messages": []},
+                                   session_id="custom-default", turn_id="t1",
+                                   model="custom:deepseek-v4.1-flash", provider="custom")
+        self.assertEqual(self.decisions[0]["current"], "tokenharbor:deepseek-v4.1-flash")
+        self.assertFalse(self.decisions[0]["pinned"])
+
+    def test_vendor_qualified_different_vendor_remains_pinned(self):
+        self.turn("different-vendor", "t1", "other/deepseek-v4.1-flash")
+        self.assertTrue(self.decisions[0]["pinned"])
+
+    def test_different_bare_id_remains_pinned_on_custom_endpoint(self):
+        plugin._on_pre_llm_call(session_id="custom-pin", turn_id="t1", user_message=HARD)
+        with mock.patch.object(plugin.route, "load_config", return_value={"provider_aliases": {"custom": "tokenharbor"}}):
+            plugin._on_llm_request(request={"model": "another-model", "messages": []},
+                                   session_id="custom-pin", turn_id="t1",
+                                   model="another-model", provider="custom")
+        self.assertTrue(self.decisions[0]["pinned"])
+
     def test_a_model_the_user_picked_is_never_overridden(self):
         result = self.turn("s3", "t1", "openrouter:z-ai/glm-5.3-flash")
         self.assertTrue(self.decisions[0]["pinned"])

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix #45: the routing pin check recognizes a vendor-qualified default when a mapped custom endpoint reports the same model as a bare id; preserve explicit pins and distinct vendor-qualified ids. Add offline middleware regressions. No routing switch, provider alias, endpoint or default change.
+
 ## 0.23.0 (2026-10-09)
 
 Released by the daily Jev steward: 9 commit(s) on main since v0.22.2.

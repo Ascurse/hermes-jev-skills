@@ -456,6 +456,13 @@ def _on_llm_request(request: Optional[Dict[str, Any]] = None, session_id: str = 
         current = f"{catalog_provider}:{bare}"
         default = _default_model()
         default_bare = str(default).split(":", 1)[-1] if default else ""
+        # A custom endpoint can report only its bare model id while Hermes's default
+        # includes the vendor namespace. Treat that one spelling difference as equal;
+        # keep distinct vendor-qualified ids pinned, and do not relax ordinary providers.
+        same_default = bare == default_bare or (
+            provider == "custom" and "/" in default_bare and "/" not in bare
+            and bare == default_bare.rsplit("/", 1)[-1]
+        )
         messages = request.get("messages") or request.get("input") or []
         try:
             if provider == "custom" and catalog_provider == "custom":
@@ -466,7 +473,7 @@ def _on_llm_request(request: Optional[Dict[str, Any]] = None, session_id: str = 
                 turn["text"], current=current, profile=_profile(), only_provider=catalog_provider, session_id=session_id,
                 context_tokens=len(json.dumps(messages, default=str)) // 4,
                 has_images="image_url" in json.dumps(messages[-1:], default=str),
-                pinned=bool(default_bare) and bare != default_bare,   # you ran /model: your choice wins
+                pinned=bool(default_bare) and not same_default,   # you ran /model: your choice wins
                 # Answers bought in the pre-call request by `turn.decide_turn`, when that
                 # request was allowed to carry them. None means ask here, as before.
                 answers=turn.get("route_answers"))

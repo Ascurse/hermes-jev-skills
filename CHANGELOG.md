@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix #46: read current Hermes `session_model_usage` when available, preserving model/provider, call and token totals, cache split, and subscription versus metered classification; retain the legacy `messages` fallback. State window and unknown-billing caveats explicitly. Thanks @vgarlu for the reproducible schema report.
+
 ## 0.23.1 (2026-10-13)
 
 Released by the daily Jev steward: 1 commit(s) on main since v0.23.0.

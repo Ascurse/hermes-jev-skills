@@ -36,6 +36,8 @@ class Usage:
     requests: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
     cost_usd: float = 0.0
     source: str = "metered"        # "metered" | "subscription"
     seat: Optional[str] = None     # which flat-fee seat, when source == "subscription"
@@ -156,10 +158,13 @@ def report(
     by_model: Dict[str, Dict[str, Any]] = {}
     for row in rows:
         entry = by_model.setdefault(row.model, {"model": row.model, "source": row.source, "requests": 0,
-                                                "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0})
+                                                "input_tokens": 0, "output_tokens": 0, "cache_read_tokens": 0,
+                                                "cache_write_tokens": 0, "cost_usd": 0.0})
         entry["requests"] += row.requests
         entry["input_tokens"] += row.input_tokens
         entry["output_tokens"] += row.output_tokens
+        entry["cache_read_tokens"] += row.cache_read_tokens
+        entry["cache_write_tokens"] += row.cache_write_tokens
         entry["cost_usd"] = round(entry["cost_usd"] + row.cost_usd, 4)
     for entry in by_model.values():
         tokens = entry["input_tokens"] + entry["output_tokens"]
@@ -189,6 +194,8 @@ def report(
             "total_usd": round(spent + seat_fees, 2),
             "requests": sum(r.requests for r in rows),
             "tokens": sum(r.tokens for r in rows),
+            "cache_read_tokens": sum(r.cache_read_tokens for r in rows),
+            "cache_write_tokens": sum(r.cache_write_tokens for r in rows),
             "subscription_tokens": sum(r.tokens for r in subscription),
         },
         "by_model": sorted(by_model.values(), key=lambda e: -e["cost_usd"]),
@@ -257,25 +264,51 @@ def from_hermes_sessions(state_db: str, *, since: Optional[float] = None, label:
         conn.row_factory = sqlite3.Row
     except sqlite3.Error:
         return []
-    columns = {r[1] for r in conn.execute("pragma table_info(messages)")}
-    if not {"role", "timestamp"} <= columns:
-        return []
-    model_col = "model" if "model" in columns else None
-    token_col = "token_count" if "token_count" in columns else None
-    if not (model_col and token_col):
-        return []
-    query = (f"select {model_col} as model, count(*) as n, sum(case when role='assistant' then {token_col} else 0 end) as out_t, "
-             f"sum(case when role!='assistant' then {token_col} else 0 end) as in_t "
-             f"from messages where timestamp > ? and {model_col} is not null and {token_col} is not null group by {model_col}")
-    out: List[Usage] = []
     try:
-        for row in conn.execute(query, (since,)):
-            out.append(Usage(model=str(row["model"]), requests=int(row["n"] or 0),
-                             input_tokens=int(row["in_t"] or 0), output_tokens=int(row["out_t"] or 0),
-                             cost_usd=0.0, source="subscription", label=label))
+        columns = {r[1] for r in conn.execute("pragma table_info(session_model_usage)")}
+        needed = {"model", "billing_provider", "billing_mode", "api_call_count",
+                  "input_tokens", "output_tokens", "actual_cost_usd", "last_seen"}
+        if needed <= columns:
+            # These are cumulative session/model rows, not individual calls. Last-seen
+            # selects sessions active in the window; a session crossing its boundary
+            # contributes its whole total (the schema cannot split those tokens).
+            cache_read = "sum(cache_read_tokens)" if "cache_read_tokens" in columns else "0"
+            cache_write = "sum(cache_write_tokens)" if "cache_write_tokens" in columns else "0"
+            query = f"""select model, billing_provider, billing_mode,
+                        sum(api_call_count) as calls, sum(input_tokens) as in_t,
+                        sum(output_tokens) as out_t, sum(actual_cost_usd) as cost,
+                        {cache_read} as cache_read, {cache_write} as cache_write
+                       from session_model_usage
+                       where last_seen > ? and model is not null
+                       group by model, billing_provider, billing_mode"""
+            return [Usage(
+                model=(f"{row['billing_provider']}:{row['model']}"
+                       if row["billing_provider"] else str(row["model"])),
+                requests=int(row["calls"] or 0), input_tokens=int(row["in_t"] or 0),
+                output_tokens=int(row["out_t"] or 0),
+                cache_read_tokens=int(row["cache_read"] or 0),
+                cache_write_tokens=int(row["cache_write"] or 0),
+                cost_usd=float(row["cost"] or 0),
+                source=("subscription" if row["billing_mode"] == "subscription_included"
+                        else "metered"), label=label,
+            ) for row in conn.execute(query, (since,))]
+
+        columns = {r[1] for r in conn.execute("pragma table_info(messages)")}
+        if not {"role", "timestamp", "model", "token_count"} <= columns:
+            return []
+        query = ("select model, count(*) as n, "
+                 "sum(case when role='assistant' then token_count else 0 end) as out_t, "
+                 "sum(case when role!='assistant' then token_count else 0 end) as in_t "
+                 "from messages where timestamp > ? and model is not null "
+                 "and token_count is not null group by model")
+        return [Usage(model=str(row["model"]), requests=int(row["n"] or 0),
+                      input_tokens=int(row["in_t"] or 0), output_tokens=int(row["out_t"] or 0),
+                      cost_usd=0.0, source="subscription", label=label)
+                for row in conn.execute(query, (since,))]
     except sqlite3.Error:
         return []
-    return out
+    finally:
+        conn.close()
 
 
 def render(data: Mapping[str, Any]) -> str:
@@ -285,6 +318,8 @@ def render(data: Mapping[str, Any]) -> str:
              f"  metered        ${s['metered_usd']:>10,.2f}",
              f"  seat fees      ${s['subscription_fees_usd']:>10,.2f}",
              f"  total          ${s['total_usd']:>10,.2f}   ({s['requests']:,} requests, {s['tokens']:,} tokens)"]
+    if s.get("cache_read_tokens") or s.get("cache_write_tokens"):
+        lines.append(f"  cache          {s['cache_read_tokens']:,} read, {s['cache_write_tokens']:,} write tokens (separate from input/output)")
     if data["by_model"]:
         lines += ["", f"  {'model':40}{'$':>10}{'tokens':>14}{'tok/req':>9}{'$/M':>9}"]
         for e in data["by_model"][:12]:

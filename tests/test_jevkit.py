@@ -1241,6 +1241,50 @@ class SpendTests(unittest.TestCase):
         self.assertIn("if the same tokens had run entirely on", text)
         self.assertIn("floor, not a promise", text)
 
+    def test_hermes_collector_prefers_session_model_usage_and_keeps_providers_separate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.db"
+            conn = sqlite3.connect(path)
+            conn.execute("create table messages (role text, timestamp real, model text, token_count integer)")
+            conn.execute("insert into messages values ('assistant', 110, 'legacy', 999)")
+            conn.execute("""create table session_model_usage (
+                model text, billing_provider text, billing_mode text, api_call_count integer,
+                input_tokens integer, output_tokens integer, actual_cost_usd real,
+                last_seen real, cache_read_tokens integer, cache_write_tokens integer)""")
+            conn.executemany("insert into session_model_usage values (?,?,?,?,?,?,?,?,?,?)", [
+                ("same", "provider-a", "subscription_included", 2, 100, 20, 0, 110, 400, 10),
+                ("same", "provider-a", "subscription_included", 3, 150, 30, 0, 120, 500, 20),
+                ("same", "provider-b", "chat_completions", 1, 50, 10, 1.25, 110, 100, 0),
+                ("old", "provider-a", "", 10, 500, 50, 2, 90, 0, 0),
+            ])
+            conn.commit()
+            conn.close()
+            rows = spend.from_hermes_sessions(str(path), since=100, label="fleet")
+        by_model = {r.model: r for r in rows}
+        self.assertEqual(set(by_model), {"provider-a:same", "provider-b:same"})
+        a = by_model["provider-a:same"]
+        self.assertEqual((a.requests, a.input_tokens, a.output_tokens, a.source, a.label,
+                          a.cache_read_tokens, a.cache_write_tokens),
+                         (5, 250, 50, "subscription", "fleet", 900, 30))
+        self.assertEqual(spend.report(rows, prices=self.PRICES)["spend"]["cache_read_tokens"], 1000)
+        b = by_model["provider-b:same"]
+        self.assertEqual((b.requests, b.input_tokens, b.output_tokens, b.cost_usd, b.source),
+                         (1, 50, 10, 1.25, "metered"))
+
+    def test_hermes_collector_uses_legacy_messages_when_new_table_is_absent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.db"
+            conn = sqlite3.connect(path)
+            conn.execute("create table messages (role text, timestamp real, model text, token_count integer)")
+            conn.executemany("insert into messages values (?,?,?,?)", [
+                ("user", 110, "old-model", 4), ("assistant", 111, "old-model", 6),
+                ("assistant", 90, "old-model", 99)])
+            conn.commit()
+            conn.close()
+            rows = spend.from_hermes_sessions(str(path), since=100)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual((rows[0].requests, rows[0].input_tokens, rows[0].output_tokens), (2, 4, 6))
+
     def test_hermes_collector_tolerates_a_db_without_the_columns(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "state.db"

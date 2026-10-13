@@ -555,6 +555,10 @@ def cmd_spend(args: argparse.Namespace) -> int:
         raise SystemExit("no usage: pass --usage <export.json> and/or --hermes-db <state.db>")
     seats = [spend.Seat(**s) for s in json.loads(Path(args.seats).read_text(encoding="utf-8"))] if args.seats else []
     data = spend.report(rows, candidates=args.compare or [], seats=seats, days=args.days)
+    if args.hermes_db:
+        data["caveat"] += (" Hermes database usage is cumulative per session/model; sessions crossing "
+                           "the window boundary contribute their full totals. Zero actual_cost_usd "
+                           "may mean unknown billing, not free usage; estimated costs are not billed costs.")
     if args.json:
         return _out(data)
     sys.stdout.write(spend.render(data) + "\n")

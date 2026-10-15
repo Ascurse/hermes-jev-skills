@@ -2,12 +2,71 @@
 
 ## Unreleased
 
-- Add opt-in `jevkit.local_goal` closed whole-action tables for bounded caller-owned execution loops, with exact non-sensitive field bindings and caller-verified plaintext input types, unchanged confidence gates, stale-result rejection and offline privacy/refusal tests. No driver or routing defaults change. Document synthetic headless Arc/Ultrafast comparisons and the separate native/end-to-end qualification gate in `docs/local-goal.md`.
+- Harden image-preview readiness: validate image references in actual string values rather than JSON object keys or escaped syntax; reject whitespace-only references. Apply the cloud shadow's sensitive-question skip to its A/B runner and recheck the opt-in immediately before sending after image preparation. Add six regression tests. Keep cloud image forwarding off by default.
+
+- Add image support for TypeSafe's "Dreamer-ready" images preview: `jevkit/images.py` reads PNG/baseline-JPEG headers and refuses, before sending, anything the API would refuse (format, animation, progressive JPEG, size and pixel limits); `client.ask(..., assets=...)` sends images with the `TypeSafe-Danger-Zone-Images` header to TypeSafe only (`images_unsupported` elsewhere) and refuses unreferenced assets; new `client.box()` question with a validated `{left, top, right, bottom}` answer. Add a cloud half to the vision shadow (`jevkit/cloud_vision.py`, `/jev vision_cloud shadow`, kill switch `VISION_CLOUD_OFF`): TypeSafe Jev answers the same decision-shaped `vision_analyze` questions and logs beside Jev-Omni. Off by default and separate from `/jev vision`, because the picture leaves the machine; it never changes a tool result. JPEGs with a rotating EXIF orientation are refused (the API ignores it). Add `scripts/live_images_check.py` (one live request with a known answer) and `scripts/vision_cloud_ab.py` (accuracy and coverage per cut-off on labelled checks). Tested on real PIL/ImageMagick output, 40k fuzzed headers and a strict local HTTP stand-in. See `docs/images.md`.
+
+- Guard the gate-ask red-team miss `g031`: moving the live Hermes config directory now asks a person via a local fact, before model inference. Regression covers the replay and benign neighboring moves; no threshold or fleet-switch change.
+
+- Fix #46: read current Hermes `session_model_usage` when available, preserving model/provider, call and token totals, cache split, and subscription versus metered classification; retain the legacy `messages` fallback. State window and unknown-billing caveats explicitly. Thanks @vgarlu for the reproducible schema report.
+
+## 0.23.1 (2026-10-13)
+
+Released by the daily Jev steward: 1 commit(s) on main since v0.23.0.
+
+- Fix #45: the routing pin check recognizes a vendor-qualified default when a mapped custom endpoint reports the same model as a bare id; preserve explicit pins and distinct vendor-qualified ids. Add offline middleware regressions. No routing switch, provider alias, endpoint or default change.
+
+**Changes and fixes**
+
+- Fix custom endpoint model pin comparison (#45) (31f476c)
+
+## 0.23.0 (2026-10-09)
+
+Released by the daily Jev steward: 9 commit(s) on main since v0.22.2.
+
+- Add an offline-by-default bounded design-choice reference example (`jevkit.design_choice`), with complete preset IDs, escaped local copy, contrast/bounds checks, opt-in validated Jev selection and exact baseline fallbacks. Add offline transport/CLI tests and an optional 12-case real-browser QA script. No live selection benchmark, new skill, routing hook or default change; see `docs/design-choice.md`.
+
+- Fix #36: make the Hermes manifest provider-neutral instead of prompting every installation for a TypeSafe-only key. Document runtime provider/key resolution and preserve no-key fail-open behavior. Add OpenRouter-only disposable-install and offline no-key regressions; no key flow, endpoint or provider default changes.
+
+- Reconcile the previously installed opt-in `jevkit.local_goal` pilot with the public source: whole prevalidated action tables, exact non-sensitive plaintext bindings, protected-field/stale-result refusal and offline regressions. Preserve historical synthetic-engine qualification receipts without asserting new native/end-to-end performance. No default driver, confidence, routing or gateway changes.
+
+- Harden frozen-screen collector recovery: require agreement between write-ahead attempts, local completed calls, inherited call receipts and terminal sent-row outcomes. Refuse ambiguous evidence before creating output or making requests. Six offline corruption regressions; no replay, paid calls, detector or threshold changes.
+
+- Complete the authorized frozen #25 public regression replay with pinned TypeSafe `jev-1.13.0`, capped single-POST collection and verified never-sent-row continuation. Actual aggregate withholding: 322/1,051 attack-labeled rows and 1/1,050 clean-labeled rows, retaining 11 fail-opens and two local-only rows. Publish sanitized provenance/accounting and an honest scorecard; no reserve scoring, threshold tuning or detector/default changes. Conservative list-price spend upper bound $0.061657764 under a $5 approval. #25 remains open.
+
+- Add an offline, hash-only screening preflight for #25 that verifies frozen source/selection identities and captures the real screening payload construction without inference or credential lookup. Reverify pinned public receipts and publish a sanitized preflight summary. Reserve rows are not screened, no detection scores are fabricated, and a live collector/budget remains separately gated.
+
+**New**
+
+- Add tested bounded design-choice reference example (23a5409)
+- Reconcile opt-in local-goal pilot with public source (7b7da6c)
+- Add verified offline screening preflight without inference (58434c8)
+- Add reviewed bounded collector for authorized frozen screening replay (38395b5)
+
+**Changes and fixes**
+
+- Fix provider-neutral Hermes manifest and installation regression (bf348be)
+- Resume only unattempted rows while carrying conservative prior spend (27b7825)
+- Publish actual capped screening replay and advisory-only safety findings (3b2e46b)
+- Fail closed on inconsistent collector recovery evidence (88dba15)
+- Document first-principles PR review and combined offline qualification (c714060)
+
+## 0.22.2 (2026-10-07)
+
+Released by the daily Jev steward: 5 commit(s) on main since v0.22.1.
 - Installer: preserve the canonical shared skill directory and aliases instead of replacing its source with self-referencing symlinks; regression tests cover both destructive edge cases.
 
 - **One copy of each skill on a machine**: once Hermes is installed, Claude Code, Codex and `~/.agents` skill folders get symlinks to `<hermes root>/skills/jev/<skill>` instead of their own copies, so all three read the same files; copies remain the fallback without Hermes or symlinks. Tests cover link, re-run and no-Hermes cases.
 - **Field notes from a product review run on Jev** (`jev-browser-use`, `jev-frontier-work`, `jev-model-routing`): verify a "goal reached" pick with a Noul over page text (labels-only observation over-claimed: 0.73 vs 0.07); persona browsing as a UX review; machine-wide text helper for typing in `~/.config/jev/browser.json` (`claude-cli` provider uses the signed-in Claude Code CLI with no key; local servers need no key); citation-check a delegated report's `file:line` claims with `not_enough` first; script-file `--run` checks; `--no-changes-expected` for reviews; an `escalate` after a verified review that leaves a decision open goes to the person.
 - **A field cap of 0 or 1 now caps**: `privacy.redact` cut to `text[:limit // 2] + … + text[-(limit // 2):]`, and with `limit // 2 == 0` the tail slice is the whole text, so a `field_limits` entry of 0 or 1 sent the field in full. It now keeps no tail there.
+
+**Changes and fixes**
+
+- fix(privacy): a redact cap of 0 or 1 no longer keeps the whole text (13573e9)
+- Share one copy of each skill across agents; field notes from a Jev product review (9340309)
+- jev-browser-use: machine-wide text helper config; local servers need no key (384a7b9)
+- jev-browser-use: claude-cli text helper (no key); config path honors XDG_CONFIG_HOME (3183e2e)
+- Preserve shared skill sources when installer targets their canonical path (0cd0a60)
 
 ## 0.22.1 (2026-10-02)
 

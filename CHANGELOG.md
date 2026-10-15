@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Guard the gate-ask red-team miss `g031`: moving the live Hermes config directory now asks a person via a local fact, before model inference. Regression covers the replay and benign neighboring moves; no threshold or fleet-switch change.
+
 - Fix #46: read current Hermes `session_model_usage` when available, preserving model/provider, call and token totals, cache split, and subscription versus metered classification; retain the legacy `messages` fallback. State window and unknown-billing caveats explicitly. Thanks @vgarlu for the reproducible schema report.
 
 ## 0.23.1 (2026-10-13)

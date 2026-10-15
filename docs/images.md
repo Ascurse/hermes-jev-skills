@@ -43,7 +43,15 @@ on machines whose `vision_analyze` pictures may leave the machine. `touch
 It shares the local shadow's sampling (`vision_sample`) and daily ceiling (`vision_daily_max`),
 skips calls with a `region` (no cropping without an image library), and never changes a tool
 result. The row holds ids, hashes, classes, confidence, tokens and timings, never the picture,
-path, question or answer text.
+path, question or answer text. The cloud switch is rechecked immediately before sending,
+so disabling it during image preparation prevents that upload; an HTTP request already
+in flight cannot be recalled. The A/B runner also skips sensitive questions before reading
+or sending their pictures.
+
+Reference validation considers actual string values (including Unicode), never object keys
+or JSON escaping. Whitespace-only references are refused locally. Header inspection is
+not a full image decoder: a corrupt payload can still be rejected by the API, and callers
+must retain their fail-open path.
 
 ## Before switching it on
 

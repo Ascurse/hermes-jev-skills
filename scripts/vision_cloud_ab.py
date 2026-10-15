@@ -38,6 +38,9 @@ def run(rows: List[Dict[str, Any]], model: Optional[str] = None,
         if shape == "open" or label.lower() not in {o.lower() for o in omni_vision.OPTIONS.get(shape, ())}:
             skipped["shape_or_label"] = skipped.get("shape_or_label", 0) + 1
             continue
+        if cloud_vision.privacy.is_sensitive(str(row.get("question") or "")):
+            skipped["sensitive_question"] = skipped.get("sensitive_question", 0) + 1
+            continue
         try:
             ref, picture = images.asset(row["image"])
         except images.ImageError as error:

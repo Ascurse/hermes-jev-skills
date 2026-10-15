@@ -96,6 +96,11 @@ def job(payload: Dict[str, Any], queued: float, mode: Callable[[], str], dropped
             return finish("skipped", reason=f"image_{error.code}")
         except OSError:
             return finish("skipped", reason="image_gone")
+        # A user can disable the feature while a queued image is being read/encoded.
+        # Recheck immediately before the outbound call; an already in-flight HTTP request
+        # cannot be recalled, but image preparation must not freeze earlier consent.
+        if mode() != "shadow":
+            return finish("skipped", reason="disabled_before_send")
         started = time.monotonic()
         try:
             out = asker({"image": ref}, {"verdict": _question(question, shape, ref)},

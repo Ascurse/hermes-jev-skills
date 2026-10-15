@@ -206,6 +206,37 @@ class Requests(unittest.TestCase):
         self.assertNotIn("assets", body)
         self.assertNotIn(images.DANGER_ZONE_HEADER, headers)
 
+    def test_a_key_is_not_an_image_reference(self):
+        ref, item = images.asset(png())
+        with self.assertRaises(ValueError):
+            client.ask({ref: "only a key"}, {"ok": client.noul("Is it fine?")},
+                       assets={ref: item}, api_key="k", provider="typesafe",
+                       transport=self.transport({"ok": {"type": "noul", "noul": 0.5}}))
+        self.assertEqual(self.sent, [])
+
+    def test_question_type_is_not_an_image_reference(self):
+        _, item = images.asset(png())
+        with self.assertRaises(ValueError):
+            client.ask("no picture", {"ok": client.noul("Is it fine?")}, assets={"noul": item},
+                       api_key="k", provider="typesafe",
+                       transport=self.transport({"ok": {"type": "noul", "noul": 0.5}}))
+        self.assertEqual(self.sent, [])
+
+    def test_unicode_reference_matches_actual_string_values(self):
+        _, item = images.asset(png())
+        client.ask({"picture": "picture-\u2603"}, {"ok": client.noul("Is it fine?")},
+                   assets={"picture-\u2603": item}, api_key="k", provider="typesafe",
+                   transport=self.transport({"ok": {"type": "noul", "noul": 0.5}}))
+        self.assertEqual(len(self.sent), 1)
+
+    def test_whitespace_is_not_an_asset_reference(self):
+        _, item = images.asset(png())
+        with self.assertRaises(ValueError):
+            client.ask("a b", {"ok": client.noul("Is it fine?")}, assets={" ": item},
+                       api_key="k", provider="typesafe",
+                       transport=self.transport({"ok": {"type": "noul", "noul": 0.5}}))
+        self.assertEqual(self.sent, [])
+
     def test_an_unreferenced_asset_is_refused_before_sending(self):
         ref, item = images.asset(png())
         with self.assertRaises(ValueError):
@@ -305,6 +336,21 @@ class CloudShadow(Base):
         self.assertEqual(self.cloud_rows()[-1]["reason"], "region_unsupported")
         self.assertEqual(self.asked, [])
 
+    def test_disabling_during_image_preparation_prevents_sending(self):
+        self.plugin.switches.set_mode("vision_cloud", "shadow", shared=True)
+        asset = self.plugin.cloud_vision.images.asset
+
+        def stop_before_send(path):
+            result = asset(path)
+            self.plugin.switches.set_mode("vision_cloud", "off", shared=True)
+            return result
+
+        with mock.patch.object(self.plugin.cloud_vision.images, "asset", side_effect=stop_before_send):
+            self.call()
+            self.settle()
+        self.assertEqual(self.asked, [])
+        self.assertEqual(self.cloud_rows()[-1]["reason"], "disabled_before_send")
+
     def test_a_jev_error_is_logged_not_raised(self):
         self.plugin.switches.set_mode("vision_cloud", "shadow", shared=True)
         with mock.patch.object(self.plugin.cloud_vision.client, "ask", side_effect=self.plugin.cloud_vision.client.JevError("http_400")):
@@ -365,6 +411,15 @@ class LiveCheckScript(unittest.TestCase):
 
 
 class AbScript(unittest.TestCase):
+    def test_sensitive_questions_are_skipped_before_reading_or_sending(self):
+        ab = _script("vision_cloud_ab")
+        with mock.patch.object(ab.images, "asset", return_value=("ref", {})) as materialize, \
+                mock.patch.object(ab.client, "ask", return_value={"answers": {"verdict": {"choice": "Yes", "confidence": .9}}}) as ask:
+            report = ab.run([{"image": "/not-read.png", "question": "Is the password hunter2 visible?", "label": "Yes"}])
+        materialize.assert_not_called()
+        ask.assert_not_called()
+        self.assertEqual(report["skipped"], {"sensitive_question": 1})
+
     def test_accuracy_and_cutoffs_hold_no_content(self):
         ab = _script("vision_cloud_ab")
         import tempfile

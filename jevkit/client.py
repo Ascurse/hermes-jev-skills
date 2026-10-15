@@ -660,7 +660,8 @@ def ask(
     default_model = _provider_model(via)
     request: Dict[str, Any] = {"state": state, "model": model or os.environ.get("TYPESAFE_MODEL") or default_model,
                                "questions": {name: dict(q) for name, q in questions.items()}}
-    pictures = _checked_assets(assets, encoded_state, request["questions"])
+    pictures = (_checked_assets(assets, state if isinstance(state, str) else json.loads(encoded_state),
+                                request["questions"]) if assets else {})
     needs_images = bool(pictures) or any(q["type"] == "box" for q in questions.values())
     if needs_images and via != "typesafe":
         raise JevError("images_unsupported", f"images and box questions go to TypeSafe only, not {via}")
@@ -721,18 +722,28 @@ def ask(
             "provider": "custom" if endpoint else via}
 
 
-def _checked_assets(assets: Optional[Mapping[str, Mapping[str, Any]]], encoded_state: str,
+def _checked_assets(assets: Optional[Mapping[str, Mapping[str, Any]]], state: Any,
                     questions: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]:
-    """The assets as sent, each referenced somewhere and carrying base64 data of a known format."""
+    """Check references against actual string values, never JSON syntax or object keys."""
     if not assets:
         return {}
-    text = encoded_state + json.dumps(questions, separators=(",", ":"), default=str)
+    pending, values = [state], []
+    for question in questions.values():
+        pending.extend((question.get("instructions"), question.get("criteria")))
+    while pending:
+        value = pending.pop()
+        if isinstance(value, str):
+            values.append(value)
+        elif isinstance(value, Mapping):
+            pending.extend(value.values())
+        elif isinstance(value, (list, tuple)):
+            pending.extend(value)
     out: Dict[str, Dict[str, Any]] = {}
     for ref, item in assets.items():
         ref = str(ref)
-        if not ref or len(ref.encode("utf-8")) > images.MAX_REFERENCE_BYTES:
+        if not ref.strip() or len(ref.encode("utf-8")) > images.MAX_REFERENCE_BYTES:
             raise ValueError(f"asset reference {_shown(ref)} must be 1 to {images.MAX_REFERENCE_BYTES} bytes")
-        if ref not in text:
+        if not any(ref in value for value in values):
             raise ValueError(f"asset {_shown(ref)} is never referenced in the state or a question")
         if (not isinstance(item, Mapping) or not isinstance(item.get("data_base64"), str)
                 or item.get("format") not in images.FORMATS):

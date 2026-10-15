@@ -19,8 +19,9 @@ out = client.ask({"render": ref},
 
 - `images.asset` reads the header only. Nothing is resized, rotated or re-encoded (standard
   library only), so an image the API would refuse raises `images.ImageError` with a short code
-  (`side_out_of_range`, `progressive_jpeg`, `animated_png`, ...) and the caller fails open.
-  Prepare pictures upright, at most 1568 px on the longest side, as PNG or baseline JPEG.
+  (`side_out_of_range`, `progressive_jpeg`, `animated_png`, `exif_rotated`, ...) and the caller fails open.
+  A JPEG whose EXIF says it is stored rotated is refused, because the API ignores EXIF
+  orientation and the model would see it on its side. Prepare pictures upright, at most 1568 px on the longest side, as PNG or baseline JPEG.
 - Images and box questions go to TypeSafe (or an explicit `TYPESAFE_BASE_URL`) only. Through
   OpenRouter, Venice or Zen, `ask` raises `JevError("images_unsupported")` without sending.
 - A box always comes back: there is no "not found". Ask a `noul` beside it and ignore the box
@@ -43,3 +44,20 @@ It shares the local shadow's sampling (`vision_sample`) and daily ceiling (`visi
 skips calls with a `region` (no cropping without an image library), and never changes a tool
 result. The row holds ids, hashes, classes, confidence, tokens and timings, never the picture,
 path, question or answer text.
+
+## Before switching it on
+
+Run these on the machine that holds the key (the key is never printed):
+
+```bash
+python3 scripts/live_images_check.py              # one request: Noul, Choice and Box on a drawn square
+python3 scripts/live_images_check.py --no-box     # if the account is not on Jev 1.14 yet
+python3 scripts/vision_cloud_ab.py labelled.jsonl --out vision-cloud-ab.json
+```
+
+`live_images_check.py` exits 0 only when TypeSafe accepts the request and answers a picture
+with a known answer correctly (box overlap of at least 0.5). `vision_cloud_ab.py` reads the
+hand-labelled checks (`{"image", "question", "label"}` per line), asks each the way the shadow
+does, and reports accuracy and, per confidence cut-off, coverage and accuracy of the kept
+checks. `THRESHOLD` in `jevkit/cloud_vision.py` is Jev-Omni's 0.6 until that report says
+otherwise. The report holds counts only.

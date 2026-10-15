@@ -79,6 +79,8 @@ def _jpeg_size(data: bytes) -> Tuple[int, int]:
             offset += 2
             continue
         (length,) = struct.unpack(">H", data[offset + 2:offset + 4])
+        if marker == 0xE1 and _exif_rotated(data[offset + 4:offset + 2 + length]):
+            raise ImageError("exif_rotated")
         if marker in _SOF_OTHER:
             raise ImageError("progressive_jpeg" if marker == 0xC2 else "unsupported_jpeg")
         if marker in _SOF_SEQUENTIAL:
@@ -90,6 +92,32 @@ def _jpeg_size(data: bytes) -> Tuple[int, int]:
             break
         offset += 2 + length
     raise ImageError("corrupt_jpeg")
+
+
+def _exif_rotated(segment: bytes) -> bool:
+    """True when an APP1 Exif segment says the pixels are stored rotated or mirrored.
+
+    The API strips metadata and does not apply EXIF orientation, so a phone photo stored on
+    its side reaches the model on its side. Without an image library it cannot be turned
+    upright here, so it is refused. Exif this cannot read is treated as upright: the API drops
+    it either way, and the pixels are then what is sent.
+    """
+    if not segment.startswith(b"Exif\x00\x00"):
+        return False
+    tiff = segment[6:]
+    try:
+        order = {b"II": "<", b"MM": ">"}[tiff[:2]]
+        (ifd,) = struct.unpack(order + "I", tiff[4:8])
+        (count,) = struct.unpack(order + "H", tiff[ifd:ifd + 2])
+        for index in range(count):
+            entry = tiff[ifd + 2 + 12 * index:ifd + 14 + 12 * index]
+            tag, kind = struct.unpack(order + "HH", entry[:4])
+            if tag == 0x0112 and kind == 3:
+                (value,) = struct.unpack(order + "H", entry[8:10])
+                return value not in (0, 1)
+    except (KeyError, struct.error):
+        return False
+    return False
 
 
 def check(data: bytes) -> str:

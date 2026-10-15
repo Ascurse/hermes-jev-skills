@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add image support for TypeSafe's "Dreamer-ready" images preview: `jevkit/images.py` reads PNG/baseline-JPEG headers and refuses, before sending, anything the API would refuse (format, animation, progressive JPEG, size and pixel limits); `client.ask(..., assets=...)` sends images with the `TypeSafe-Danger-Zone-Images` header to TypeSafe only (`images_unsupported` elsewhere) and refuses unreferenced assets; new `client.box()` question with a validated `{left, top, right, bottom}` answer. Add a cloud half to the vision shadow (`jevkit/cloud_vision.py`, `/jev vision_cloud shadow`, kill switch `VISION_CLOUD_OFF`): TypeSafe Jev answers the same decision-shaped `vision_analyze` questions and logs beside Jev-Omni. Off by default and separate from `/jev vision`, because the picture leaves the machine; it never changes a tool result. See `docs/images.md`.
+
 - Guard the gate-ask red-team miss `g031`: moving the live Hermes config directory now asks a person via a local fact, before model inference. Regression covers the replay and benign neighboring moves; no threshold or fleet-switch change.
 
 - Fix #46: read current Hermes `session_model_usage` when available, preserving model/provider, call and token totals, cache split, and subscription versus metered classification; retain the legacy `messages` fallback. State window and unknown-billing caveats explicitly. Thanks @vgarlu for the reproducible schema report.

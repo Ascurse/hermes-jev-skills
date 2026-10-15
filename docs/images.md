@@ -1,0 +1,45 @@
+# Images and Box questions
+
+TypeSafe's System One accepts PNG and JPEG images in the state, instructions and criteria,
+and a `box` question that says where something is in an image (docs.typesafe.ai/images,
+docs.typesafe.ai/primitives/box). Both are **Dreamer-ready**: not production-ready, and the
+request format, answers and limits may change. This repo uses them in shadow only.
+
+## In code
+
+```python
+from jevkit import client, images
+
+ref, picture = images.asset("/tmp/render.png")          # checked against the API's limits
+out = client.ask({"render": ref},
+                 {"clipped": client.noul("Is any text in `render` cut off?"),
+                  "where": client.box("the Submit button in `render`")},
+                 assets={ref: picture}, model="jev-1.14.0")
+```
+
+- `images.asset` reads the header only. Nothing is resized, rotated or re-encoded (standard
+  library only), so an image the API would refuse raises `images.ImageError` with a short code
+  (`side_out_of_range`, `progressive_jpeg`, `animated_png`, ...) and the caller fails open.
+  Prepare pictures upright, at most 1568 px on the longest side, as PNG or baseline JPEG.
+- Images and box questions go to TypeSafe (or an explicit `TYPESAFE_BASE_URL`) only. Through
+  OpenRouter, Venice or Zen, `ask` raises `JevError("images_unsupported")` without sending.
+- A box always comes back: there is no "not found". Ask a `noul` beside it and ignore the box
+  when that is low. Box needs Jev 1.14; `jev-latest` may not be it yet.
+- Images are billed as input tokens, like text.
+
+## In Hermes: the cloud vision shadow
+
+`/jev vision_cloud shadow` asks TypeSafe Jev the same decision-shaped `vision_analyze`
+questions the local Jev-Omni shadow (`/jev vision shadow`) answers, and logs one row per call
+to `logs/jev-vision.jsonl` with `model: typesafe-jev`. The two switches are independent, so
+both models can be compared against the helper model's answer on the same calls.
+
+**This sends the picture to TypeSafe.** The question goes through `privacy.redact`, and a
+question that looks sensitive is skipped, but a screenshot cannot be screened. Turn it on only
+on machines whose `vision_analyze` pictures may leave the machine. `touch
+~/.hermes/jev/VISION_CLOUD_OFF` stops it at once.
+
+It shares the local shadow's sampling (`vision_sample`) and daily ceiling (`vision_daily_max`),
+skips calls with a `region` (no cropping without an image library), and never changes a tool
+result. The row holds ids, hashes, classes, confidence, tokens and timings, never the picture,
+path, question or answer text.

@@ -22,8 +22,6 @@ provides_hooks:
   - transform_llm_output
   - pre_approval_request
   - post_approval_response
-provides_middleware:
-  - llm_request
 tags: [jev, typesafe, routing, memory, compaction, computer-use]
 config_schema:
   routing: {type: str, description: "off | shadow | on"}

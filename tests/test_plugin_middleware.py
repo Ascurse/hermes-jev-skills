@@ -251,6 +251,26 @@ class EffortMiddlewareTests(unittest.TestCase):
         result = self.turn(session="manual", request_extra={"reasoning_effort": "low"})
         self.assertEqual(result["request"]["reasoning_effort"], "low")
 
+    def codex_turn(self, session="codex", turn_id="t1", model=DEFAULT, **request_extra):
+        """A turn whose request is a Codex Responses payload: ``input``, not ``messages``."""
+        plugin._on_pre_llm_call(session_id=session, turn_id=turn_id, user_message=HARD)
+        request = {"input": [{"role": "user", "content": HARD}], "model": model}
+        request.update(request_extra)
+        return plugin._on_llm_request(request=request, session_id=session, turn_id=turn_id,
+                                      model=model, provider="openrouter")
+
+    def test_codex_wire_carries_effort_inside_the_reasoning_object(self):
+        self.enable_for()
+        result = self.codex_turn(reasoning={"effort": "medium", "summary": "auto"})
+        self.assertNotIn("reasoning_effort", result["request"])
+        self.assertEqual(result["request"]["reasoning"], {"effort": "xhigh", "summary": "auto"})
+
+    def test_codex_wire_with_reasoning_disabled_is_left_alone(self):
+        self.enable_for()
+        result = self.codex_turn(session="codex-off")
+        self.assertNotIn("reasoning_effort", result["request"])
+        self.assertNotIn("reasoning", result["request"])
+
     def test_shadow_and_off_do_not_mutate(self):
         self.enable_for()
         with mock.patch.object(plugin, "_setting",

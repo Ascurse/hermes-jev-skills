@@ -424,7 +424,19 @@ def _on_post_tool_call(tool_name: str = "", args: Any = None, session_id: str = 
 
 
 def _with_effort(request: Dict[str, Any], level: str) -> Dict[str, Any]:
-    """Set only the standard top-level field; never touch provider-specific extra_body."""
+    """Set only the standard top-level field; never touch provider-specific extra_body.
+
+    The Codex Responses wire (``input`` payload) carries effort inside ``reasoning.effort``
+    and its preflight rejects a top-level ``reasoning_effort`` as a NON-retryable client
+    error, which killed every routed turn. Merge into the ``reasoning`` object there; when
+    reasoning is disabled on that wire (no object) leave the request alone instead of
+    re-enabling it.
+    """
+    if "input" in request and "messages" not in request:
+        reasoning = request.get("reasoning")
+        if not isinstance(reasoning, dict):
+            return request
+        return {**request, "reasoning": {**reasoning, "effort": level}}
     return {**request, "reasoning_effort": level}
 
 

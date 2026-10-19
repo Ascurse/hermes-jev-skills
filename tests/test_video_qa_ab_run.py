@@ -22,6 +22,21 @@ class CollectorTests(unittest.TestCase):
     def fake(self,feature,state,questions,**kwargs):
         self.assertEqual(kwargs['retries'],0);self.assertEqual(kwargs['provider'],'typesafe')
         return dict(jev_model=ab.MODEL,input_tokens=100,answers={q:dict(choice='clear',confidence=1) for q in questions})
+    def test_arm_order_is_counterbalanced_before_outcomes(self):
+        manifest=json.loads((self.fixture/'manifest.json').read_text())
+        manifest['rows']=[dict(r,id=r['id']+str(i)) for r in manifest['rows'] for i in range(2)]
+        labels={r['id']:'clean' for r in manifest['rows']}
+        protocol=json.loads((self.fixture/'protocol.json').read_text())
+        protocol.update(manifest_sha256=ab.digest(manifest),labels_sha256=ab.digest(labels),phase_counts={'development':2,'confirmation':2})
+        for name,obj in [('manifest',manifest),('labels',labels),('protocol',protocol)]:
+            (self.fixture/(name+'.json')).write_text(json.dumps(obj))
+        run.freeze(self.fixture,self.out);order=[]
+        def invoke(feature,state,questions,**kwargs):
+            order.append('A' if questions==ab.questions('A') else 'B')
+            return self.fake(feature,state,questions,**kwargs)
+        run.run(self.fixture,self.out,ask=invoke)
+        self.assertEqual(order,['A','B','B','A','A','B','B','A'])
+
     def test_full_rehearsal_and_replay_refusal(self):
         run.freeze(self.fixture,self.out)
         result=run.run(self.fixture,self.out,ask=self.fake)

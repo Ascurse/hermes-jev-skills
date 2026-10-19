@@ -53,6 +53,41 @@ def describe_install(state):
     return 'unverified source/install identity; no main-match claim'
 
 
+def wire_existing(module):
+    """Opt-in bridge for an existing daily collector; never execute its main/release path."""
+    import inspect
+    import re
+    import time
+    if getattr(module,'_jev_reporting_wired',False):return
+    old_usage,old_summary=module.usage,module.summary
+    def installed(sha,ci,tests,dry=False):
+        return install_state(sha,ci,tests,repo=module.REPO,home=module.ROOT_HOME,
+                             switches=module.SWITCHES,git=module.git,run=module.run,dry=dry)
+    def collected(hours=24):
+        data=old_usage(hours)
+        homes=[module.ROOT_HOME]+[p.parent for p in (module.ROOT_HOME/'profiles').glob('*/config.yaml')]
+        data['common_usage']=usage_totals(homes,time.time()-hours*3600)
+        return data
+    def described(*args,**kwargs):
+        data=inspect.signature(old_summary).bind_partial(*args,**kwargs).arguments
+        text=old_summary(*args,**kwargs)
+        if data.get('paused'):return text
+        inst=data.get('inst',{});use=data.get('use',{})
+        text=re.sub(r'(?m)^- \*\*Fleet copy:\*\*.*$',lambda m:'- **Fleet copy:** '+describe_install(inst)+'.',text)
+        common=use.get('common_usage',{});totals=common.get('totals',{})
+        value=totals.get('estimated_cost_usd')
+        estimate='unavailable/partial' if value is None else '$'+format(value,'.6f')
+        extra=('\n- **Common-ledger calls:** '+str(totals.get('calls','unavailable'))+
+               '; recorded-rate estimate '+estimate+' (not invoice spend). '+
+               str(totals.get('unknown_cost_rows','unavailable'))+' unknown-cost rows; '+
+               str(common.get('unavailable_files','unavailable'))+' unavailable ledgers. Historical unmetered calls may be absent. '+
+               'Routing shadow estimates are not realized savings; do not sum calls with routing/skill decisions.\n'+
+               '- **Runtime:** root install inventory only; per-profile rollout verification is separate. Installed file identity is not a running-process attestation; no restart performed.\n')
+        return text.rstrip()+extra
+    module.install_state,module.usage,module.summary=installed,collected,described
+    module._jev_reporting_wired=True
+
+
 def install_state(sha,ci,tests,*,repo,home,switches,git,run,dry=False):
     """Never downgrade a feature tree or install from unverified/dirty source."""
     repo=Path(repo); home=Path(home); switches=Path(switches)

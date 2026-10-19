@@ -105,8 +105,8 @@ def run(fixture,out,ask=None):
     started=time.monotonic()
     for phase in ('development','confirmation'):
         phase_records=[]
-        for row in [r for r in manifest['rows'] if r['split']==phase]:
-            for arm in ('A','B'):
+        for index,row in enumerate(r for r in manifest['rows'] if r['split']==phase):
+            for arm in (('A','B') if index%2==0 else ('B','A')):
                 if known+RESERVE>cap:stop='cap_reservation';break
                 identity=hashlib.sha256((row['id']+':'+arm).encode()).hexdigest()[:24]
                 attempt=out/'attempts'/(identity+'.json')

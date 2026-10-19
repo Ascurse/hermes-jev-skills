@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add the tested opt-in bridge for existing daily stewardship collectors, separating root install identity from published main and exposing common-ledger estimates/unknowns. Counterbalance future A/B requests, while retaining the first exploratory run and its documented ordering deviation.
+
 - Qualify the synthetic question A/B collector under a scoped paid ceiling, retain unknown-outcome reservations and replay refusal, and record the exploratory 24-frame result with its arm-order limitation. Honor `retries=0` at the native pooled HTTP transport layer, including stale connections.
 
 - Correct Responses effort delivery without enabling disabled reasoning or overriding explicit/manual values; keep Chat Completions wire shape and accurate applied-effort notices, including follow-up requests. Incorporates the wire-format issue identified in PR #49 with additional boundary regressions. No routing or reasoning-mode activation.

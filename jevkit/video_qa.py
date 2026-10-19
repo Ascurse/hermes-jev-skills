@@ -10,7 +10,7 @@ import math
 import os
 import re
 import time
-from . import client,images,privacy,ledger
+from . import client,images,privacy,ledger,usage
 
 MODEL='jev-1.14.0'
 THRESHOLD=.9
@@ -91,7 +91,10 @@ def screen(job,reader,asker=None,assetter=None,max_calls=64,timeout_s=30,on_atte
     if (type(max_calls) is not int or not 0<=max_calls<=64
             or type(timeout_s) not in (int,float) or not math.isfinite(timeout_s) or not 0<timeout_s<=120):
         raise ValueError('Invalid bounded call/time budget')
-    asker=asker or client.ask; assetter=assetter or images.asset
+    if asker is None:
+        from functools import partial
+        asker=partial(usage.ask,'video_qa')
+    assetter=assetter or images.asset
     started=time.monotonic(); calls=tokens=errors=0; cache={}; results=[]
     base={'mode':'default_triage','model':MODEL,'threshold':THRESHOLD,'final_acceptance':False,
           'source_sha256':job['source_sha256'],
@@ -154,6 +157,8 @@ def screen(job,reader,asker=None,assetter=None,max_calls=64,timeout_s=30,on_atte
                                        input_tokens=count,wall_ms=round((time.monotonic()-t)*1000,3))
                             if _clear(verdict['choice'],verdict.get('confidence')): row['decision']='candidate_clear'
                             cache[frame['sha256']]={k:v for k,v in row.items() if k not in ('id','wall_ms','input_tokens')}
+                except OSError:
+                    row['reason']='usage_unavailable'; errors=3
                 except (client.JevError,images.ImageError,KeyError,TypeError,ValueError):
                     row['reason']='model_unavailable'; errors+=1
         results.append(row)
@@ -166,7 +171,8 @@ def screen(job,reader,asker=None,assetter=None,max_calls=64,timeout_s=30,on_atte
         scenes.add(f['scene'])
     for row in results: row['audit_required']=row['id'] in audit
     base.update(frames=results,model_calls=calls,input_tokens=tokens,errors=errors,
-                estimated_list_usd=ledger.cost(tokens,'typesafe',MODEL).get('list_usd'),
+                estimated_list_usd=(None if any(r['reason'] in ('usage_unavailable','model_unavailable','model_mismatch') for r in results)
+                                    else ledger.cost(tokens,'typesafe',MODEL).get('list_usd')),
                 requires_full_visual_review=not candidates,
                 triage_order_ids=[r['id'] for r in sorted(results,key=lambda r: (
                     0 if r['reason'] in ('local_failure','frame_local_fail') else

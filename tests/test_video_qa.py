@@ -25,6 +25,13 @@ class VideoQATests(unittest.TestCase):
             r,read,ask=self.run_job(j)
             read.assert_not_called(); ask.assert_not_called()
             self.assertEqual(r['review_ids'],['f0'])
+    def test_accounting_failure_stops_spending_and_requests_full_review(self):
+        asker=Mock(side_effect=OSError('fixture ledger unavailable'))
+        report=v.screen(self.job(3),reader=lambda f:DATA,asker=asker,assetter=lambda b:('picture',{}))
+        asker.assert_called_once();self.assertTrue(report['requires_full_visual_review'])
+        self.assertEqual(report['frames'][0]['reason'],'usage_unavailable')
+        self.assertIsNone(report['estimated_list_usd'])
+
     def test_missing_policy_is_local_only(self):
         j=self.job(); del j['cloud_policy']; r,read,ask=self.run_job(j)
         read.assert_not_called(); ask.assert_not_called()

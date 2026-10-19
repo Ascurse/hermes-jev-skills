@@ -96,7 +96,7 @@ def select(state: Mapping[str, Any], *, timeout: float = 1.0, transport=None) ->
         return direct('planner_inspect', 'local_planner_is_safer_or_cheaper')
     request = build_request(clean)
     try:
-        pick = choose(request, timeout=budget, transport=transport)
+        pick = choose(request, timeout=budget, transport=transport, usage_feature='blender_advice')
         confidence = pick.get('confidence')
         if (pick.get('observation_id') == request['observation_id']
                 and type(confidence) in (int, float) and math.isfinite(confidence)

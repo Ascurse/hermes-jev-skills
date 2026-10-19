@@ -22,6 +22,15 @@ def answer(request, **kwargs):
 
 
 class BlenderPolicyTests(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        directory=tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        meter=patch.dict('os.environ',{'JEV_LEDGER_PATH':str(Path(directory.name)/'ledger.jsonl'),'JEV_LEDGER':'on'})
+        meter.start(); self.addCleanup(meter.stop)
+
     def test_completion_is_local_verification_not_a_model_verdict(self):
         with patch('jevkit.blender.choose', side_effect=AssertionError('must not call')):
             self.assertEqual(blender.select(state())['action'], 'verify_artifacts')
@@ -46,6 +55,11 @@ class BlenderPolicyTests(unittest.TestCase):
                 result = blender.select(state(issue='unclear', **overrides))
                 self.assertFalse(result['jev_called'])
                 self.assertEqual(result['action'], 'planner_inspect')
+
+    def test_accounting_failure_preserves_local_planner(self):
+        with patch('jevkit.choose.usage.ask',side_effect=OSError('fixture ledger unavailable')) as ask:
+            result=blender.select(state(issue='unclear',estimated_probe_ms=5000))
+        ask.assert_called_once();self.assertEqual(result['action'],'planner_inspect')
 
     def test_live_request_contains_only_fixed_vocabulary_no_scene_content(self):
         captured = []

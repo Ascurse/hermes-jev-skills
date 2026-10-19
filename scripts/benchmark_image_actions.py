@@ -41,7 +41,7 @@ def main():
  out=a.output.resolve();out.mkdir(parents=True,exist_ok=True);os.chmod(out,0o700)
  # Exercise the actually installed Hermes modules, not an uninstalled source import.
  installed=pathlib.Path.home()/'.hermes/plugins/hermes-jev'
- sys.path.insert(0,str(installed));from jevkit import choose,client,images,switches
+ sys.path.insert(0,str(installed));from jevkit import choose,client,images,switches,usage
  assert pathlib.Path(images.__file__).is_relative_to(installed)
  assert (ROOT/'jevkit/images.py').read_bytes()==pathlib.Path(images.__file__).read_bytes()
  os.environ['TYPESAFE_MODEL']='jev-1.14.0'  # scoped to this benchmark process only
@@ -90,18 +90,18 @@ def main():
    if route=='image':
     ref,pic=images.asset(image);payload={'goal':goal,'screen':ref}
     question=client.choice('Choose one prevalidated action ID using the visible screen and goal. Do not infer hidden state.',options)
-    t=time.perf_counter();answer=client.ask(payload,{'next_action':question},assets={ref:pic},model='jev-1.14.0',provider='typesafe',timeout=10,retries=1);ms=(time.perf_counter()-t)*1000
+    t=time.perf_counter();answer=usage.ask('image_action',payload,{'next_action':question},assets={ref:pic},model='jev-1.14.0',provider='typesafe',timeout=10,retries=0);ms=(time.perf_counter()-t)*1000
     verdict=answer['answers']['next_action'];pick=verdict['choice'];confidence=verdict['confidence'];model=answer.get('jev_model','unknown')
    else:
     request={'schema':choose.REQUEST_SCHEMA,'goal':goal,'observation_id':o['obs'],'regions':[{'id':e['id'],'role':e['role'],'label':e['label'],'interactive':not e.get('info',False)} for e in elems if e.get('label')][:100],'history':[],'candidates':candidates}
-    t=time.perf_counter();answer=choose.choose(request,timeout=10);ms=(time.perf_counter()-t)*1000;pick=answer['selected_id'];confidence=answer['confidence'];model='jev-1.14.0'
+    t=time.perf_counter();answer=choose.choose(request,timeout=10,usage_feature='image_action');ms=(time.perf_counter()-t)*1000;pick=answer['selected_id'];confidence=answer['confidence'];model='jev-1.14.0'
    image_pick,image_confidence=pick,confidence
    fallback_ms=0.0;fallback_used=False
    if route=='image' and safe_pick(pick,confidence,table) is None and task!='visual':
     # Preserve the image confidence floor. Labels are an explicitly measured fallback.
     current=observe()
     request={'schema':choose.REQUEST_SCHEMA,'goal':goal,'observation_id':current['obs'],'regions':[{'id':e['id'],'role':e['role'],'label':e['label'],'interactive':not e.get('info',False)} for e in current['elements'] if e.get('label')][:100],'history':[],'candidates':candidates}
-    t=time.perf_counter();fallback=choose.choose(request,timeout=10);fallback_ms=(time.perf_counter()-t)*1000
+    t=time.perf_counter();fallback=choose.choose(request,timeout=10,usage_feature='image_action');fallback_ms=(time.perf_counter()-t)*1000
     pick=fallback['selected_id'];confidence=fallback['confidence'];fallback_used=True
    selected=safe_pick(pick,confidence,table);verified=False
    if selected is not None:

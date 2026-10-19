@@ -16,7 +16,7 @@ import sys
 import time
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from jevkit import client, images, ledger
+from jevkit import client, images, ledger, usage
 
 THRESHOLD=.9
 MODEL='jev-1.14.0'
@@ -109,7 +109,7 @@ def run(manifest, output, consent=False, timeout_s=120) -> dict:
             t=time.monotonic(); attempts+=1
             try:
                 state,questions=request_parts(ref)
-                out=client.ask(state,questions,
+                out=usage.ask('video_qa_trial',state,questions,
                     assets={ref:picture},provider='typesafe',model=MODEL,
                     timeout=min(10,remaining),retries=0)
                 verdict=out['answers']['verdict']; count=out.get('input_tokens')

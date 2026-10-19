@@ -11,6 +11,15 @@ SPEC.loader.exec_module(trial)
 
 
 class VideoTrialTests(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        directory=tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        meter=patch.dict('os.environ',{'JEV_LEDGER_PATH':str(Path(directory.name)/'ledger.jsonl'),'JEV_LEDGER':'on'})
+        meter.start(); self.addCleanup(meter.stop)
+
     def test_code_failure_cannot_be_cleared(self):
         self.assertEqual(trial.route('clear', .99, True), 'review')
 

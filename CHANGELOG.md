@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Correct Responses effort delivery without enabling disabled reasoning or overriding explicit/manual values; keep Chat Completions wire shape and accurate applied-effort notices, including follow-up requests. Incorporates the wire-format issue identified in PR #49 with additional boundary regressions. No routing or reasoning-mode activation.
+- Distinguish published main, dirty checkout, installed managed code/skills and unverified loaded runtime. Add a checked daily-steward adapter, external dependency fingerprints and metadata-only common-ledger aggregation; never overwrite an installed feature candidate merely to match main.
+- Meter standalone Blender/video/image-action helpers through hash-only durable write-ahead events with hidden retries disabled. Coalesce logical calls, retain unknown spend, close daily budgets on unknown usage and label rate/counterfactual estimates separately from invoices and realized savings.
+- Refresh workflow evidence, code-first and task-specific confidence guidance while preserving required GUI/browser choice and final verification. Prepare a fresh 24-frame synthetic question-design A/B fixture and strict offline scorer; no paid run, floor reduction, production-question replacement or automatic promotion.
+
 - Make video QA use a general local-first triage/review-planning default through `jev-video-qa`, with task-specific requirements, privacy-safe no-upload fallback, exact-frame deduplication, mandatory audits and low-coverage stop. Preserve the broader holdout’s two raw tiny-text misses and zero confident-clear coverage; do not claim general review-time savings. No blanket cloud-vision opt-in or automatic artifact acceptance.
 
 - Add an opt-in synthetic video-frame Jev QA trial and original encoded/decode fixture, consent/hash/path/replay safeguards, conservative review routing and offline boundary tests. Retain finite known-answer results and the same-set safety recheck with explicit cost/accuracy limits. No automatic frame clearance, private uploads, cloud vision opt-in, routing or gateway change.

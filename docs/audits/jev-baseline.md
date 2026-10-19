@@ -1,5 +1,19 @@
 # JEV routing baseline and remediation, 2026-10-20
 
+## Version scopes
+
+| Scope | Version | Evidence and meaning |
+|---|---|---|
+| Installed plugin at audit snapshot | 0.20.0 | Installed manifest and entrypoint; historical runtime observations below |
+| Initial audit source revision | 0.20.0 | `45ed9d43696c1f57a7d0768e3afc3740e018cdfe`, plus preserved local runtime changes |
+| PR repository base after rebase | 0.24.0 | `7b56de6627557e8bebb22f1538d75b37555a5623`; upstream code and tests |
+| Proposed PR package metadata | 0.24.1 | Paired library/manifest patch bump; no installation or live upgrade |
+
+The audit is of the installed v0.20.0 snapshot, while the proposed code is based
+on repository v0.24.0. The 1,340-test result belongs to the earlier v0.20-based
+patch; 1,621 tests passed after rebasing. Subsequent focused-review validation is
+recorded separately in `jev-validation.md`; these counts are not interchangeable.
+
 ## Scope and provenance
 
 Read-only runtime investigation; implementation in a separate worktree on
@@ -113,6 +127,10 @@ schema or claim endpoint compatibility. The smallest supported change is to bind
 cached decisions to provider, exact endpoint, host model and outgoing model, and
 accurately record whether an assignment changed the request. This prevents a
 decision for one connection from being reused after a fallback or model switch.
+After any observed context mismatch, invalidation is sticky for that turn: an
+A -> B -> A callback sequence cannot revive A's decision. Repeated callbacks
+retain their incoming model and effort, without stale routing or effort notices.
+A fresh `pre_llm_call` creates independent state for the next turn.
 Endpoint comparison is conservative and in-memory only; even a benign URL change
 causes fallback. Existing string aliases remain operator assertions; nested named
 maps remain rejected. They are not newly certified as safe endpoint routing.
@@ -168,11 +186,24 @@ provider identity, inventory version and model IDs for each run.
 
 Comparison record schema (one row per case and arm): `case_id`, `category`,
 `arm` (baseline/routed), `run_id`, `policy_hash`, `inventory_hash`, `requested_model`,
-`effective_model`, `executed_model`, `execution_verified`, `request_id`,
+`effective_model`, `executed_model`, `data_kind`, `execution_verified`,
+`execution_evidence_id`, `request_id`,
 `completion`, `rubric_scores`, `reviewer_ids`, `latency_ms`, `input_tokens`,
-`output_tokens`, `cached_tokens`, `actual_cost_usd`, `cost_source`, `error`, `retries`.
+`output_tokens`, `cached_tokens`, `actual_cost_usd`, `cost_source`, `cost_evidence_id`,
+`review_kind`, `review_evidence_id`, `error`, `retries`.
 Missing measurements stay null. Compare only matched pairs; publish sample sizes,
 category strata and uncertainty. No quality improvement has been measured here.
+
+Both arms must explicitly declare `data_kind: measured`, boolean
+`execution_verified: true` and a nonblank `execution_evidence_id` before contributing
+any measured delta. Synthetic pairs (`data_kind: synthetic`), mixed provenance and
+unclassified legacy records are counted as excluded. Billed cost additionally
+requires `cost_source` in `provider_invoice`, `provider_billing`, `gateway_billing`
+and a nonblank `cost_evidence_id`; arbitrary labels and tariff estimates are excluded.
+Quality additionally requires `review_kind: human`, a nonempty list of distinct,
+nonblank string `reviewer_ids`, and a nonblank `review_evidence_id`. The tool checks
+structure and caller attestations; it does not authenticate receipts, reviewers
+or upstream execution. Audit those references before publishing production results.
 
 ## Cost and latency methodology
 

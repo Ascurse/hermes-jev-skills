@@ -130,6 +130,37 @@ class RoutingMiddlewareTests(unittest.TestCase):
             self.assertIsNone(self.turn("same", "t1", DEFAULT))
         self.assertFalse(self.logs[-1]["applied"])
 
+    def test_context_change_invalidates_routing_until_next_turn(self):
+        for mode in ("on", "shadow"):
+            for changed in ({"provider": "custom"}, {"base_url": "http://other/v1"},
+                            {"model": "user-pin"}, {"request_model": "user-pin"}):
+                with self.subTest(mode=mode, changed=changed), mock.patch.object(
+                        plugin, "_setting", lambda name, default: mode if name == "routing" else default):
+                    self.turn("sticky", "t1", DEFAULT)
+                    plugin._TURNS["sticky"]["effort"] = "high"
+                    before = len(self.decisions)
+                    changed_args = {"provider": "openrouter", "model": DEFAULT, "base_url": ""}
+                    changed_args.update({k: v for k, v in changed.items() if k != "request_model"})
+                    for args, request_model in [
+                        (changed_args, changed.get("request_model", DEFAULT)),
+                        ({"provider": "openrouter", "model": DEFAULT}, DEFAULT),
+                        (changed_args, changed.get("request_model", DEFAULT)),
+                    ]:
+                        request = {"model": request_model, "messages": []}
+                        original = dict(request)
+                        self.assertIsNone(plugin._on_llm_request(
+                            request=request, session_id="sticky", turn_id="t1", **args))
+                        self.assertEqual(request, original)
+                        self.assertFalse(self.logs[-1]["applied"])
+                    self.assertEqual(len(self.decisions), before)
+                    self.assertNotIn("effort", plugin._TURNS["sticky"])
+                    with mock.patch.object(plugin, "_setting", return_value="on"):
+                        self.assertIsNone(plugin._on_transform_output("answer", session_id="sticky"))
+                    # Invalidating one session must not poison another, or the next turn.
+                    self.turn("other-session", "t1", DEFAULT)
+                    self.turn("sticky", "t2", DEFAULT)
+                    self.assertEqual(len(self.decisions), before + 2)
+
     def test_endpoint_binding_is_not_logged(self):
         plugin._on_pre_llm_call(session_id="url", turn_id="t1", user_message=HARD)
         plugin._on_llm_request(request={"model": DEFAULT}, model=DEFAULT,

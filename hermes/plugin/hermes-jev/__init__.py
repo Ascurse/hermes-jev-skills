@@ -451,16 +451,22 @@ def _on_llm_request(request: Optional[Dict[str, Any]] = None, session_id: str = 
     mode = _setting("routing", "off")
     if mode not in ("on", "shadow") or not isinstance(request, dict):
         return None
-    with _LOCK:
-        turn = _TURNS.get(session_id or "-")
-    if not turn or turn["turn_id"] != turn_id:
-        return None
-    decision = turn["decision"]
     # A turn can survive a fallback or a /model change. Never reuse a decision bought
     # for a different connection or model. Keep the endpoint only in memory: URLs may
     # contain credentials, so this binding must never be included in telemetry.
     binding = (provider, base_url, model, request.get("model", model))
-    if decision is not None and turn.get("route_binding") != binding:
+    with _LOCK:
+        turn = _TURNS.get(session_id or "-")
+        if not turn or turn["turn_id"] != turn_id:
+            return None
+        decision = turn["decision"]
+        if decision is not None and turn.get("route_binding") != binding:
+            # Irreversible for this turn: A -> B -> A must not revive A's decision.
+            # A fresh pre_llm_call creates the next turn's independent state.
+            turn["route_invalidated"] = True
+            turn.pop("effort", None)
+        invalidated = turn.get("route_invalidated", False)
+    if invalidated:
         _log({"kind": "route_effective", "mode": mode, "applied": False,
               "requested_model": request.get("model", model),
               "effective_request_model": request.get("model", model),
@@ -597,6 +603,8 @@ def _on_transform_output(response_text: str = "", session_id: str = "", **_: Any
         return None
     with _LOCK:
         turn = _TURNS.get(session_id or "-")
+    if (turn or {}).get("route_invalidated"):
+        return None
     decision = (turn or {}).get("decision")
     effort_tag = f" · effort {(turn or {}).get('effort')}" if (turn or {}).get("effort") else ""
     if not decision or not decision.get("routed"):

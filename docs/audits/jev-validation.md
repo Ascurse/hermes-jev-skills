@@ -1,5 +1,37 @@
 # Validation and independent review
 
+## PR #51 focused follow-up
+
+The review was limited to the three requested concerns. Before implementation,
+new regressions reproduced A -> B -> A cache revival (including stale notices)
+and synthetic records entering measured deltas. Those regressions now pass.
+
+- Version evidence is explicit in the audit and PR description: installed audit
+  snapshot 0.20.0, original source revision `45ed9d4`, rebased repository base
+  `7b56de6` at 0.24.0, proposed package 0.24.1. No new runtime inspection, installer
+  or restart was performed in this follow-up.
+- A context mismatch invalidates routing for the remaining turn. Regression
+  sequences cover A -> B -> A -> B for provider, endpoint, host model and outgoing
+  request model, active/shadow behavior, no extra classifier calls, no request
+  mutation, no stale notices/effort, independent sessions and next-turn reset.
+- Comparator tests cover synthetic and mixed provenance, missing/invalid
+  execution attestations, cost-source whitelist and evidence references, typed
+  human-review metadata, valid schema/delta calculations and synthetic pollution
+  exclusion. These are synthetic unit fixtures, not model measurements.
+- Targeted suites: **40 middleware tests and 11 offline audit/evaluation tests
+  passed**. Full suite: **1,628 tests passed**, exit 0, 34.097 seconds, with
+  `GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1` in the test process.
+- Both independent read-only reviewers found no actionable issue in the focused
+  changes. They inspected code/tests/docs; the implementation agent ran the tests.
+- Release scan passed for 340 text files; changed Python AST syntax checks and
+  `git diff --check` passed. Existing upstream binaries remain unscanned and
+  unchanged by this follow-up.
+
+The earlier 1,340 and 1,621 results below are historical checkpoints, not the
+current test count. Measurement evidence is structurally checked caller
+attestation; authenticity must be audited separately. No live compatibility,
+quality or savings claim is added, and no merge or deployment is authorized.
+
 ## Final checks
 
 - After rebasing onto refreshed upstream 0.24.0: **1,621 tests passed**, exit 0,

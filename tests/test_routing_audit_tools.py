@@ -15,6 +15,18 @@ def load(name):
 
 
 class AuditTools(unittest.TestCase):
+    @staticmethod
+    def measurement_records():
+        # Synthetic unit inputs deliberately exercise the measured-record schema.
+        # These opaque evidence IDs are test doubles, not execution receipts.
+        return [{"case_id": "a", "run_id": "1", "arm": arm, "data_kind": "measured",
+                 "execution_verified": True, "execution_evidence_id": "test-execution-" + arm,
+                 "cost_source": "provider_invoice", "cost_evidence_id": "test-invoice-" + arm,
+                 "review_kind": "human", "reviewer_ids": ["test-reviewer"],
+                 "review_evidence_id": "test-review-" + arm, "quality_score": quality,
+                 "latency_ms": latency, "actual_cost_usd": cost}
+                for arm, cost, quality, latency in (("baseline", 0.2, 2, 20), ("routed", 0.1, 3, 10))]
+
     def test_untrusted_event_kind_is_not_published(self):
         result = load("audit_routing")._summarize([
             json.dumps({"kind": "private-sentinel"}), json.dumps({"kind": {"bad": "shape"}})])
@@ -43,12 +55,82 @@ class AuditTools(unittest.TestCase):
 
     def test_paired_measurements_and_duplicate_rejection(self):
         module = load("compare_routing_eval")
-        rows = [{"case_id": "a", "run_id": "1", "arm": arm,
-                 "execution_verified": True, "cost_source": "synthetic-fixture",
-                 "actual_cost_usd": cost} for arm, cost in (("baseline", 0.2), ("routed", 0.1))]
-        self.assertAlmostEqual(module.compare(rows)["routed_minus_baseline"]["actual_cost_usd"]["mean"], -0.1)
+        rows = self.measurement_records()
+        result = module.compare(rows)
+        self.assertAlmostEqual(result["routed_minus_baseline"]["actual_cost_usd"]["mean"], -0.1)
+        self.assertEqual(result["routed_minus_baseline"]["quality_score"]["mean"], 1)
+        self.assertEqual(result["human_reviewed_pairs"], 1)
+        self.assertEqual(result["excluded_pairs"], {})
         with self.assertRaises(ValueError):
             module.compare(rows + rows)
+
+    def test_synthetic_pairs_never_enter_measured_differences(self):
+        rows = [{"case_id": "fixture", "run_id": "1", "arm": arm,
+                 "data_kind": "synthetic", "execution_verified": True,
+                 "cost_source": "synthetic-fixture", "reviewer_ids": "synthetic-reviewer",
+                 "quality_score": 4, "latency_ms": 10, "actual_cost_usd": cost}
+                for arm, cost in (("baseline", 0.2), ("routed", 0.1))]
+        result = load("compare_routing_eval").compare(rows)
+        self.assertEqual(result["routed_minus_baseline"], {})
+        self.assertEqual(result["excluded_pairs"], {"synthetic": 1})
+        self.assertEqual(result["execution_verified_pairs"], 0)
+
+    def test_mixed_or_unclassified_pairs_are_excluded(self):
+        module = load("compare_routing_eval")
+        for value in (None, "synthetic", "unknown", True, ["measured"]):
+            with self.subTest(data_kind=value):
+                rows = self.measurement_records()
+                rows[1]["data_kind"] = value
+                result = module.compare(rows)
+                self.assertEqual(result["routed_minus_baseline"], {})
+                self.assertEqual(result["excluded_pairs"], {"missing_or_mixed_provenance": 1})
+
+    def test_unverified_or_unreferenced_execution_is_excluded(self):
+        module = load("compare_routing_eval")
+        for field, value in (("execution_verified", "true"), ("execution_verified", 1),
+                             ("execution_evidence_id", " "), ("execution_evidence_id", [])):
+            with self.subTest(field=field, value=value):
+                rows = self.measurement_records()
+                rows[1][field] = value
+                result = module.compare(rows)
+                self.assertEqual(result["routed_minus_baseline"], {})
+                self.assertEqual(result["execution_verified_pairs"], 0)
+
+    def test_cost_requires_recognized_source_and_evidence(self):
+        module = load("compare_routing_eval")
+        for field, value in (("cost_source", "synthetic-fixture"), ("cost_source", "estimated"),
+                             ("cost_source", True), ("cost_source", ["provider_invoice"]),
+                             ("cost_evidence_id", ""), ("cost_evidence_id", {})):
+            with self.subTest(field=field, value=value):
+                rows = self.measurement_records()
+                rows[1][field] = value
+                deltas = module.compare(rows)["routed_minus_baseline"]
+                self.assertNotIn("actual_cost_usd", deltas)
+                self.assertIn("latency_ms", deltas)
+
+    def test_quality_requires_structured_human_review_evidence(self):
+        module = load("compare_routing_eval")
+        for field, value in (("reviewer_ids", "synthetic-reviewer"), ("reviewer_ids", {}),
+                             ("reviewer_ids", [""]), ("reviewer_ids", ["a", " a "]),
+                             ("reviewer_ids", [1]), ("review_kind", "automated"),
+                             ("review_evidence_id", None)):
+            with self.subTest(field=field, value=value):
+                rows = self.measurement_records()
+                rows[1][field] = value
+                result = module.compare(rows)
+                self.assertEqual(result["human_reviewed_pairs"], 0)
+                self.assertNotIn("quality_score", result["routed_minus_baseline"])
+                self.assertIn("latency_ms", result["routed_minus_baseline"])
+
+    def test_synthetic_data_cannot_pollute_a_measured_pair(self):
+        module = load("compare_routing_eval")
+        rows = self.measurement_records()
+        synthetic = [{**row, "case_id": "fixture", "data_kind": "synthetic",
+                      "actual_cost_usd": 9999, "latency_ms": 9999} for row in rows]
+        result = module.compare(rows + synthetic)
+        self.assertEqual(result["routed_minus_baseline"], module.compare(rows)["routed_minus_baseline"])
+        self.assertEqual(result["paired"], 2)
+        self.assertEqual(result["excluded_pairs"], {"synthetic": 1})
 
     def test_replay_never_buys_missing_answers(self):
         module = load("replay_routing_eval")

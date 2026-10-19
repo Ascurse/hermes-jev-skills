@@ -40,6 +40,8 @@ So, for a handoff:
 
 The `hermes-handoff` plugin does all four. `HANDOFF_JEV=1` puts the Jev pre-pass back if you want to compare on your own sessions with `evals/compaction/run_eval.py`.
 
+Session rotation and active continuation belong to the host. On a host that handles bare `handoff` by rotating and injecting a restart capsule, continue the existing objective and carry its established scope, approvals, exclusions, budget and verification evidence. Do not add a second `/new` or reapproval gate. Capsule-only hosts must report that limitation honestly. Handoff grants no new authority and does not override explicit stop/cancel controls; `/handoff` retains the host's distinct command semantics.
+
 ## When this skill is still the right tool
 
 When the size is fixed and something has to go: a small local writer, a context you cannot grow, a digest for a person to skim. There, choosing turns with Jev beat choosing them by recency.

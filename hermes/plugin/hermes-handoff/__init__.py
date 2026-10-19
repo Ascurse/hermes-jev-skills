@@ -332,13 +332,13 @@ def _command(raw_args: str = "") -> str:
 
 
 _RULE = (
-    "If the person says just \"handoff\", they are closing this stretch of work. A short "
-    "capsule of the conversation is being written in the background and is given to the next "
-    "fresh session in this conversation. If you are answering that message, say in one line "
-    "that the handoff is being saved and that /new starts the fresh session; do not begin new "
-    "work in that reply. When a session opens with a [Handoff from the previous session] "
-    "block, that is history you already established — do not greet again or re-ask what it "
-    "settles; continue from its Next section."
+    'Bare "handoff" requests continuity of the existing objective in a fresh session, not a pause '
+    'or a new objective. Where the host rotates on it, continue from the restart capsule without '
+    'asking for /new or repeated approvals. Preserve established scope, approvals, exclusions, '
+    'budgets and stop controls; handoff adds no new authority. On a capsule-only host, report '
+    'that limitation accurately. /handoff remains the host\'s separate command. Treat restart '
+    'capsules as prior context: do not greet again, re-ask settled questions or claim completion '
+    'without verification.'
 )
 
 

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Align handoff guidance with hosts that rotate and actively continue: preserve objective scope and approvals, avoid duplicate /new or approval requests, retain stop controls, and accurately distinguish capsule-only hosts. No new authority or session-rotation implementation.
+
 - Integrate PR #49 (thanks @mxuanvan02) with explicit-effort preservation, disabled-reasoning and follow-up telemetry regressions. Retain the contributor commit in merge history; preserve manual `reasoning.effort` rather than replacing it. Include the numeric unknown-cost row count in daily stewardship summaries.
 
 - Add the tested opt-in bridge for existing daily stewardship collectors, separating root install identity from published main and exposing common-ledger estimates/unknowns. Counterbalance future A/B requests, while retaining the first exploratory run and its documented ordering deviation.

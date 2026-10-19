@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Qualify the synthetic question A/B collector under a scoped paid ceiling, retain unknown-outcome reservations and replay refusal, and record the exploratory 24-frame result with its arm-order limitation. Honor `retries=0` at the native pooled HTTP transport layer, including stale connections.
+
 - Correct Responses effort delivery without enabling disabled reasoning or overriding explicit/manual values; keep Chat Completions wire shape and accurate applied-effort notices, including follow-up requests. Incorporates the wire-format issue identified in PR #49 with additional boundary regressions. No routing or reasoning-mode activation.
 - Distinguish published main, dirty checkout, installed managed code/skills and unverified loaded runtime. Add a checked daily-steward adapter, external dependency fingerprints and metadata-only common-ledger aggregation; never overwrite an installed feature candidate merely to match main.
 - Meter standalone Blender/video/image-action helpers through hash-only durable write-ahead events with hidden retries disabled. Coalesce logical calls, retain unknown spend, close daily budgets on unknown usage and label rate/counterfactual estimates separately from invoices and realized savings.

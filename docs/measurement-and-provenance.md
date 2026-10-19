@@ -1,5 +1,7 @@
 # Measurement and installation provenance
 
+The checker denies foreign symlinks by default. Operators with explicitly authorized shared Hermes homes may pass `shared_homes=[approved_home]` to verify installer-created links to copied root skills. Only exact managed mappings in those declared homes are accepted, never an inferred parent/root or an arbitrary foreign target.
+
 ## Four identities, not one "matches main" label
 
 1. **Published main**: an exact remote-main SHA recorded as of the read. A stale local `origin/main` or successful push to a feature branch is not proof of it.

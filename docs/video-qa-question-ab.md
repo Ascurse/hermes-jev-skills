@@ -1,4 +1,4 @@
-# Fresh video-question A/B: prepared, not run
+# Fresh video-question A/B: exploratory live result recorded
 
 The production composite question and 0.9 floor stay unchanged. This is an exploratory question-design experiment, not an automatic upgrade.
 
@@ -22,9 +22,9 @@ Requires Pillow for local rendering; the main library remains standard-library o
 
 ## Live execution gate
 
-No live evaluation has been performed in this preparation. Obtain a scoped owner-approved paid cap and explicit request/token limits before a live executor is added or invoked. Do not interpret the template, a source installation, or the previous pilot's tiny estimated cost as new authority. A local rate estimate is not a provider-enforced invoice ceiling. Preserve unknown dispatch/spend and never silently retry a questionable attempt.
+The initial preparation made no live calls. An owner-approved $1 cap subsequently authorized the frozen 48-request evaluation; see [the collected result](../evidence/question-ab-20261019/REPORT.md). Obtain a new scoped grant before another paid experiment; the template is never authority. Do not interpret the template, a source installation, or the previous pilot's tiny estimated cost as new authority. A local rate estimate is not a provider-enforced invoice ceiling. Preserve unknown dispatch/spend and never silently retry a questionable attempt.
 
-Use the common meter and caller-owned immutable frame/requirements bindings. Pin the model, record the returned model, and do not mix policy/model/question versions. Counterbalance arm order per frame; use no best-of-N reruns. Keep labels local until responses are durable.
+Use the common meter and caller-owned immutable frame/requirements bindings. Pin the model, record the returned model, and do not mix policy/model/question versions. For rigorous follow-up, counterbalance arm order per frame; use no best-of-N reruns. **Protocol deviation in the first exploratory collection:** its collector used fixed A-before-B ordering, despite the planned counterbalance. This confounds latency/cache comparisons. Keep that result visible and do not describe it as a clean preregistered comparison. Keep labels local until responses are durable.
 
 Development comes first. If B has an unsafe clear or no usable coverage, stop before confirmation. If it qualifies for confirmation, consume the already-frozen set without changing questions, floor or exclusion rules. Record every attempted case, fallback, cost/latency and review outcome; do not hide partial runs.
 

@@ -45,10 +45,11 @@ def inventory(repo, revision):
         raise ValueError('No managed files in source revision')
     return result
 
-def check_install(repo, home, main_sha):
+def check_install(repo, home, main_sha, *, shared_homes=()):
     if not isinstance(main_sha,str) or not SHA.fullmatch(main_sha):
         raise ValueError('Expected an exact lowercase Git SHA-1')
     repo=Path(repo).resolve(); home=Path(home).resolve()
+    shared_homes=tuple(Path(p).resolve() for p in shared_homes)
     head=_git(repo,'rev-parse','HEAD').decode().strip()
     current=inventory(repo,head); published=inventory(repo,main_sha)
     actual={}
@@ -57,7 +58,13 @@ def check_install(repo, home, main_sha):
         if path is None: raise ValueError('Unmapped managed source file')
         try:
             # Do not follow a foreign managed-file symlink into unrelated/private material.
-            if path.resolve()!=path.absolute() and path.resolve()!=(repo/name).resolve():
+            allowed={path.absolute(),(repo/name).resolve()}
+            for shared in shared_homes:
+                candidate=_installed_path(shared,name)
+                if candidate is not None and (candidate.resolve()==candidate.absolute()
+                        or candidate.resolve()==(repo/name).resolve()):
+                    allowed.add(candidate.resolve())
+            if path.resolve() not in allowed:
                 actual[name]=None
                 continue
             if path.stat().st_size>2*1024*1024:

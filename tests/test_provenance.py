@@ -49,6 +49,24 @@ class ProvenanceTests(unittest.TestCase):
                 self.assertNotEqual(first['fingerprint'],provenance.external_skill(root)['fingerprint'])
                 self.assertNotIn('must not be read',str(first))
 
+    def test_explicit_shared_home_allows_installer_copied_skill_links(self):
+        with self.fixture(feature=False) as (repo,home,main,head):
+            child=home.parent/'child';(child/'skills').mkdir(parents=True)
+            (child/'skills/jev').symlink_to(home/'skills/jev',target_is_directory=True)
+            for name in ('jevkit/a.py','hermes/plugin/hermes-jev/__init__.py'):
+                path=provenance._installed_path(child,name);source=provenance._installed_path(home,name)
+                assert path is not None and source is not None
+                path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(source.read_bytes())
+            self.assertFalse(provenance.check_install(repo,child,main)['installed_matches_checkout'])
+            report=provenance.check_install(repo,child,main,shared_homes=[home])
+            self.assertTrue(report['installed_matches_checkout'])
+            self.assertTrue(report['matches_main'])
+            (child/'skills/jev').unlink()
+            target=child/'skills/jev/jev-demo/SKILL.md';target.parent.mkdir(parents=True)
+            foreign=home.parent/'foreign.md';foreign.write_bytes((home/'skills/jev/jev-demo/SKILL.md').read_bytes())
+            target.symlink_to(foreign)
+            self.assertFalse(provenance.check_install(repo,child,main,shared_homes=[home])['installed_matches_checkout'])
+
     def test_matching_feature_install_is_not_published_main(self):
         with self.fixture() as (repo,home,main,head):
             r=provenance.check_install(repo,home,main)

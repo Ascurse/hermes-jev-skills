@@ -18,6 +18,7 @@ class StewardTests(unittest.TestCase):
             self.assertNotIn('private-client-fixture-name',str(result))
             self.assertNotIn('private-fixture-action',str(result))
             self.assertEqual(result['totals']['unresolved_attempts'],1)
+            self.assertEqual(result['totals']['unknown_cost_rows'],1)
 
     def test_refresh_gates_never_execute_installer(self):
         cases=('dirty','ci','tests','no_auto','dry')

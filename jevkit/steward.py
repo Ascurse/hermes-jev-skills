@@ -40,6 +40,7 @@ def usage_totals(homes, since):
                 item[key]=value if isinstance(value,(int,float)) and not isinstance(value,bool) and math.isfinite(value) and value>=0 else None
             rows.append(item)
     result=ledger.summarize(rows,by_day=False)
+    result['totals']['unknown_cost_rows']=sum(row['cost_usd'] is None for row in rows)
     if unavailable:
         result["totals"].update(estimated_cost_complete=False,estimated_cost_usd=None)
     return {**result,'homes_checked':len(homes),'ledger_files':files,'unavailable_files':unavailable,

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Integrate PR #49 (thanks @mxuanvan02) with explicit-effort preservation, disabled-reasoning and follow-up telemetry regressions. Retain the contributor commit in merge history; preserve manual `reasoning.effort` rather than replacing it. Include the numeric unknown-cost row count in daily stewardship summaries.
+
 - Add the tested opt-in bridge for existing daily stewardship collectors, separating root install identity from published main and exposing common-ledger estimates/unknowns. Counterbalance future A/B requests, while retaining the first exploratory run and its documented ordering deviation.
 
 - Qualify the synthetic question A/B collector under a scoped paid ceiling, retain unknown-outcome reservations and replay refusal, and record the exploratory 24-frame result with its arm-order limitation. Honor `retries=0` at the native pooled HTTP transport layer, including stale connections.

@@ -23,6 +23,10 @@
 
 - Fix #48 (thanks @zimu002): remove the unsupported `provides_middleware` manifest declaration. Hermes v0.22.2 and current hosts register `llm_request` via `PluginContext.register_middleware` in plugin code; the declaration only produced a warning and never enabled the middleware. Add a regression preserving code registration and a warning-free manifest.
 
+## 0.24.1 (2026-10-20)
+
+- Bind cached routing decisions to provider, endpoint and model context; count actual request-model changes and add offline audit/evaluation tools. Custom identity enablement remains blocked pending host and gateway evidence. Prepared patch version; not deployed by this work.
+
 ## 0.24.0 (2026-10-16)
 
 Released by the daily Jev steward: 3 commit(s) on main since v0.23.1.

@@ -108,6 +108,45 @@ class RoutingMiddlewareTests(unittest.TestCase):
             session_id="s6", turn_id="t1", model=DEFAULT, provider="openrouter")
         self.assertIsNone(result)
 
+    def test_cached_decision_cannot_cross_provider_endpoint_or_model(self):
+        for changed in ({"provider": "custom"}, {"base_url": "http://other/v1"},
+                        {"model": "user-pin"}, {"request_model": "user-pin"}):
+            with self.subTest(changed=changed):
+                self.turn("binding", "t1", DEFAULT)
+                args = {"provider": "openrouter", "model": DEFAULT, "base_url": ""}
+                args.update({k: v for k, v in changed.items() if k != "request_model"})
+                request = {"model": changed.get("request_model", DEFAULT), "messages": []}
+                original = dict(request)
+                before = len(self.decisions)
+                self.assertIsNone(plugin._on_llm_request(
+                    request=request, session_id="binding", turn_id="t1", **args))
+                self.assertEqual(request, original)
+                self.assertEqual(len(self.decisions), before)
+                self.assertEqual(self.logs[-1]["compatibility"], "request_context_changed")
+
+    def test_unchanged_model_is_not_counted_as_applied(self):
+        with mock.patch.object(plugin.route, "decide", return_value={
+                "routed": True, "model": f"openrouter:{DEFAULT}", "model_id": DEFAULT}):
+            self.assertIsNone(self.turn("same", "t1", DEFAULT))
+        self.assertFalse(self.logs[-1]["applied"])
+
+    def test_endpoint_binding_is_not_logged(self):
+        plugin._on_pre_llm_call(session_id="url", turn_id="t1", user_message=HARD)
+        plugin._on_llm_request(request={"model": DEFAULT}, model=DEFAULT,
+                               provider="openrouter", session_id="url", turn_id="t1",
+                               base_url="http://user:private-sentinel@localhost/v1")
+        self.assertNotIn("private-sentinel", repr(self.logs))
+
+    def test_malformed_named_alias_fails_closed(self):
+        for alias in ({"dracarys": "openrouter"}, ["openrouter"], None, "bad:prefix"):
+            with self.subTest(alias=alias):
+                plugin._on_pre_llm_call(session_id="invalid", turn_id="t1", user_message=HARD)
+                with mock.patch.object(plugin.route, "load_config", return_value={
+                        "provider_aliases": {"custom": alias}}):
+                    self.assertIsNone(plugin._on_llm_request(
+                        request={"model": DEFAULT}, model=DEFAULT, provider="custom",
+                        session_id="invalid", turn_id="t1"))
+
     def test_custom_provider_without_mapping_is_not_routed_across_providers(self):
         plugin._on_pre_llm_call(session_id="custom", turn_id="t1", user_message=HARD)
         with mock.patch.object(plugin.route, "load_config", return_value={}):

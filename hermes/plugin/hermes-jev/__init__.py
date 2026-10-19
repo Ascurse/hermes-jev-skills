@@ -447,7 +447,7 @@ def _with_effort(request: Dict[str, Any], level: str) -> Dict[str, Any]:
 
 
 def _on_llm_request(request: Optional[Dict[str, Any]] = None, session_id: str = "", turn_id: Any = None,
-                    model: str = "", provider: str = "", **_: Any) -> Any:
+                    model: str = "", provider: str = "", base_url: str = "", **_: Any) -> Any:
     mode = _setting("routing", "off")
     if mode not in ("on", "shadow") or not isinstance(request, dict):
         return None
@@ -456,6 +456,18 @@ def _on_llm_request(request: Optional[Dict[str, Any]] = None, session_id: str = 
     if not turn or turn["turn_id"] != turn_id:
         return None
     decision = turn["decision"]
+    # A turn can survive a fallback or a /model change. Never reuse a decision bought
+    # for a different connection or model. Keep the endpoint only in memory: URLs may
+    # contain credentials, so this binding must never be included in telemetry.
+    binding = (provider, base_url, model, request.get("model", model))
+    if decision is not None and turn.get("route_binding") != binding:
+        _log({"kind": "route_effective", "mode": mode, "applied": False,
+              "requested_model": request.get("model", model),
+              "effective_request_model": request.get("model", model),
+              "provider": provider, "provider_identity": None,
+              "compatibility": "request_context_changed", "first_request": False,
+              "reason": "cached routing context changed; retaining original model"})
+        return None
     route_answers: Any = None
     if decision is None:                       # first API call of this turn: ask Jev exactly once
         catalog_provider = catalog.HERMES_ALIASES.get(provider, provider)
@@ -503,6 +515,7 @@ def _on_llm_request(request: Optional[Dict[str, Any]] = None, session_id: str = 
             # going quiet, which would read as "nothing needed routing".
             decision = {"routed": False, "model": current, "reason": f"routing failed ({type(error).__name__})"}
         turn["decision"] = decision
+        turn["route_binding"] = binding
         # The effort pick reads the same answers routing bought; route.decide now carries
         # them back on the decision, so no second Jev call is needed.
         route_answers = decision.get("answers")
@@ -522,12 +535,17 @@ def _on_llm_request(request: Optional[Dict[str, Any]] = None, session_id: str = 
             entry["escalate"] = {k: escalation.get(k) for k in ("rung", "kind", "model", "forced", "reason",
                                                                 "considered", "stakes")}
         _log(entry)
-    applied = mode == "on" and bool(decision.get("routed") and decision.get("model_id"))
+    requested = request.get("model", model)
+    proposed = decision.get("model_id")
+    applied = mode == "on" and bool(decision.get("routed") and proposed) and proposed != requested
     # Log the model at this middleware boundary, not merely Jev's preferred model.
     # Shadow, pins, and failed decisions must never count as applied savings. This is
     # not provider usage telemetry: a later middleware or provider may still change it.
     effective = decision["model_id"] if applied else request.get("model", model)
     _log({"kind": "route_effective", "mode": mode, "applied": applied,
+          "provider": provider, "provider_identity": None if provider == "custom" else provider,
+          "compatibility": "operator_assertion" if provider == "custom" and decision.get("routed")
+                           else "router_provider_guard" if decision.get("routed") else "not_selected",
           "requested_model": request.get("model", model), "effective_request_model": effective,
           "decision_model": decision.get("model"), "reason": decision.get("reason"),
           "first_request": turn.get("request_count", 0) == 0})

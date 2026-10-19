@@ -2,9 +2,19 @@
 
 ## Final checks
 
+- After rebasing onto refreshed upstream 0.24.0: **1,621 tests passed**, exit 0,
+  34.043 seconds with the same isolated Git environment. The branch release
+  metadata is 0.24.1; the installed runtime remains 0.20.0. Rebase conflicts were
+  limited to changelog/version metadata; newer provider-neutral manifest text,
+  pin normalization and effort behavior were preserved.
+- Final upstream-based release scan passed for **340 text files**. It lists
+  existing upstream binary evidence as unscanned; this patch changes no binaries.
+  Final `git diff --check` passed. Both independent reviewers rechecked the
+  rebased diff and validation artifact and found no new actionable issue.
 - Full suite: **1,340 tests passed**, Python 3.13, exit 0, 30.434 seconds.
   Run with `GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1` in the test process.
-  This affects only subprocess environment, not user Git configuration.
+  This was the earlier v0.20-based patch check and affects only subprocess
+  environment, not user Git configuration.
 - Requested suites tested separately before final additions: middleware 31 passed,
   jevkit 213 passed, route health 44 passed. Final full run includes these and five
   offline audit/evaluation tests.
@@ -35,7 +45,7 @@ The exact ignore rule was not changed. This is an environment-dependent test
 limitation, not a claim that ordinary-environment full tests pass.
 
 A subsequent isolated full run caught missing versioned release notes for the
-new 0.20.1 metadata. Added the required matching changelog section; final isolated
+initial 0.20.1 metadata. Added the required matching changelog section; isolated
 run passed all 1,340 tests. Neither failure was skipped.
 
 ## Standards review
@@ -45,7 +55,8 @@ and code-smell heuristics. Initial findings: missing release metadata; unchecked
 event-kind data in aggregate report; missing validation artifact. Added paired
 0.20.1 version metadata and changelog, a closed event-kind vocabulary plus a
 synthetic private-sentinel regression, context-managed file handles and this
-artifact. Reviewer rechecked code changes and reported no remaining actionable
+artifact. After upstream reconciliation release metadata advanced to 0.24.1.
+Reviewer rechecked code changes and reported no remaining actionable
 standards or code-smell findings; tests were run by the implementation agent.
 
 ## Spec and security review

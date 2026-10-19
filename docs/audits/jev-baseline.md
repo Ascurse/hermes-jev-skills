@@ -12,6 +12,11 @@ excluded from this branch. Installed plugin version is 0.20.0. Its entrypoint
 matches the dirty source entrypoint byte-for-byte, not necessarily the clean Git
 baseline. The existing private telemetry extension is intentionally excluded.
 
+Delivery update: a later fetch found 72 upstream commits beyond that baseline,
+with library/plugin version 0.24.0. The patch was rebased onto that upstream,
+preserving its newer pin and effort fixes; release metadata is now 0.24.1.
+The runtime audit above remains a v0.20.0 observation. No live upgrade occurred.
+
 Sources: `hermes/plugin/hermes-jev/__init__.py`, `jevkit/route.py`,
 `jevkit/catalog.py`, `jevkit/effort.py`, `jevkit/ledger.py`, installed plugin
 manifest, local routing settings and aggregate decision/ledger observations.
@@ -215,7 +220,7 @@ No remote PR until checks and review succeed. A PR description is prepared in
 ## Deployment and rollback
 
 Do not install or restart the live plugin from this branch. Before staging,
-reconcile the 53 upstream commits and preserve the private telemetry extension;
+preserve the private telemetry extension while reconciling with current upstream;
 review the resulting diff and rerun all checks. Obtain explicit staging approval.
 Back up installed plugin, bundled jevkit and routing/state settings with hashes
 and restrictive permissions. Test with synthetic requests and a local stub gateway,

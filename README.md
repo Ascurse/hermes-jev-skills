@@ -26,8 +26,9 @@ That is what [Jev](https://docs.typesafe.ai) is. It is TypeSafe's decision model
 | **Mailbox sorting** | Which lane an inbox message belongs in — needs reply, updates, promotional, sales, spam — and whether it is worth a person's attention | ~0.44 s p50 per message, $0.00002 each |
 | **Computer use** | The next GUI action, from a table of actions you already judged safe. `--plan` splits a multi-step command once, up front | ~0.5 s per decision |
 | **Browser use** | The next page action, same contract | ~0.4 s per step |
+| **[Blender](docs/blender.md)** | Default code-first checks and execution selection; bounded read-only Jev advice only for unclear expensive probes | Local gates; optional advice capped at 1 s |
 
-Eleven skills ship as plain `SKILL.md` files, so they are not Hermes-only. The same folder works in Claude Code, Codex, or anything that reads a skill file.
+Twelve skills ship as plain `SKILL.md` files, so they are not Hermes-only. The same folder works in Claude Code, Codex, or anything that reads a skill file.
 
 ```bash
 jev mail --file inbox.json             # sort a mailbox into lanes
@@ -130,7 +131,7 @@ Safety rails that do not depend on Jev being right:
 
 ```
 jevkit/            the library and the `jev` command (stdlib only)
-skills/            eleven SKILL.md skills, agent-agnostic
+skills/            twelve SKILL.md skills, agent-agnostic
 hermes/plugin/     the Hermes plugin
 router-dashboard/  the model routing page (`jev dashboard`)
 install.py         installer / uninstaller

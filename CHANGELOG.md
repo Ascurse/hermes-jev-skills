@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add an opt-in synthetic video-frame Jev QA trial and original encoded/decode fixture, consent/hash/path/replay safeguards, conservative review routing and offline boundary tests. Retain finite known-answer results and the same-set safety recheck with explicit cost/accuracy limits. No automatic frame clearance, private uploads, cloud vision opt-in, routing or gateway change.
+
 - Add the default `jev-blender` domain workflow, a closed-vocabulary code-first `jevkit.blender` decision boundary and `jev blender-next`. Mandatory local checks and artifact verification remain authoritative; optional one-second read-only Jev advice is limited to unclear expensive probes. Add offline boundary/CLI regressions. No model routing, credentials, image forwarding or gateway change.
 
 - Add an opt-in native image/action comparison fixture and reproducible measured receipts. Jev chooses prevalidated action IDs; installed Hermes modules and paired Co-Agent execute verified synthetic clicks and plaintext typing. Retain failed replacement and image-abstention runs; measure explicit element fallbacks without lowering confidence. Add seven offline safety/accounting tests. No default driver, cloud switch or gateway change.

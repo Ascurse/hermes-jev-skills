@@ -29,6 +29,8 @@ For an image-support review, use `scripts/live_images_check.py` only with author
 
 For a bounded synthetic video-frame QA experiment, read `docs/video-qa-trial.md` in the source repo. `scripts/video_qa_trial.py` requires explicit synthetic-image upload consent and stays advisory; its known-answer pilot does not enable the fleet vision switch or authorize private footage. Preserve the fixed model/question/confidence identities and benchmark against local checks plus selective visual review, not an invented expensive-every-frame baseline.
 
+For ordinary video QA, load `jev-video-qa` as the default workflow. Its general task-specific helper is separate from the opt-in fixed-heading pilot. It does not enable the general cloud-vision switch or authorize private images.
+
 ## Rules
 
 - The Hermes manifest intentionally does not require a single provider's environment variable. Provider/key resolution happens at runtime. An absent `TYPESAFE_API_KEY` does not mean an OpenRouter, Venice or Zen installation is broken. Use `jev doctor`'s provider/presence/reachability results, never secret-file inspection. With no key, decision calls keep their existing fail-open behavior; omission from the manifest is not a promise of keyless inference.

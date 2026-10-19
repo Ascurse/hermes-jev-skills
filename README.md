@@ -27,8 +27,9 @@ That is what [Jev](https://docs.typesafe.ai) is. It is TypeSafe's decision model
 | **Computer use** | The next GUI action, from a table of actions you already judged safe. `--plan` splits a multi-step command once, up front | ~0.5 s per decision |
 | **Browser use** | The next page action, same contract | ~0.4 s per step |
 | **[Blender](docs/blender.md)** | Default code-first checks and execution selection; bounded read-only Jev advice only for unclear expensive probes | Local gates; optional advice capped at 1 s |
+| **[Video QA](docs/video-qa.md)** | Default local-first, authorized-image triage, mandatory audits and privacy/full-review fallback; never final acceptance | The broader 33-frame synthetic holdout yielded no confident clears, so no general review-time saving is established |
 
-Twelve skills ship as plain `SKILL.md` files, so they are not Hermes-only. The same folder works in Claude Code, Codex, or anything that reads a skill file.
+Thirteen skills ship as plain `SKILL.md` files, so they are not Hermes-only. The same folder works in Claude Code, Codex, or anything that reads a skill file.
 
 ```bash
 jev mail --file inbox.json             # sort a mailbox into lanes
@@ -131,7 +132,7 @@ Safety rails that do not depend on Jev being right:
 
 ```
 jevkit/            the library and the `jev` command (stdlib only)
-skills/            twelve SKILL.md skills, agent-agnostic
+skills/            thirteen SKILL.md skills, agent-agnostic
 hermes/plugin/     the Hermes plugin
 router-dashboard/  the model routing page (`jev dashboard`)
 install.py         installer / uninstaller

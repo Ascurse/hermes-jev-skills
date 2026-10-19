@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Make video QA use a general local-first triage/review-planning default through `jev-video-qa`, with task-specific requirements, privacy-safe no-upload fallback, exact-frame deduplication, mandatory audits and low-coverage stop. Preserve the broader holdout’s two raw tiny-text misses and zero confident-clear coverage; do not claim general review-time savings. No blanket cloud-vision opt-in or automatic artifact acceptance.
+
 - Add an opt-in synthetic video-frame Jev QA trial and original encoded/decode fixture, consent/hash/path/replay safeguards, conservative review routing and offline boundary tests. Retain finite known-answer results and the same-set safety recheck with explicit cost/accuracy limits. No automatic frame clearance, private uploads, cloud vision opt-in, routing or gateway change.
 
 - Add the default `jev-blender` domain workflow, a closed-vocabulary code-first `jevkit.blender` decision boundary and `jev blender-next`. Mandatory local checks and artifact verification remain authoritative; optional one-second read-only Jev advice is limited to unclear expensive probes. Add offline boundary/CLI regressions. No model routing, credentials, image forwarding or gateway change.

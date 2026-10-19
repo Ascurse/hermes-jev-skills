@@ -41,4 +41,8 @@ This is self-review, not an independent review. The targeted default/pilot tests
 
 The full suite initially exposed a second README skill-count occurrence still saying twelve after adding the thirteenth skill. It was repaired without weakening the test; the failure summary is retained in `initial-gate.json`. Full suite rerun: **1,562 tests run, five skipped, exit 0**. Public text release guard passed. All newly included binary footage/images were originally generated synthetic fixtures, not private account/customer material; unchanged pre-existing binary assets were not adopted as new test evidence.
 
+## Installed readback
+
+Canonical installer completed without warnings or failures. Actual `jev-video-qa` and shared `vibe-editing` skill loaders passed at all 40 explicit local homes; all 40 configuration hashes matched their pre-install values. Root general cloud vision remained off and no owned resource leases remained. See `rollout.json`. No gateway restart, remote-machine update or replacement of already-built in-flight prompts is claimed.
+
 The finite trial does not cover arbitrary footage, faces, subtitles, subtle typography, compression artifacts, temporal consistency, audio, multilingual text, factual charts or real-world privacy detection. It does not establish that confidence is calibrated on all those domains. Keep fallback/audits until appropriate evidence exists; never lower the confidence floor to manufacture a fast result.

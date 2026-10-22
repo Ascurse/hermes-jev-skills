@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Integrate PR #51 (thanks @fatalmonk): bind routing reuse to request context, invalidate changed-context turns, suppress stale notices and provide offline audit/evaluation tools. Preserve current 0.25.1 metadata instead of the older proposed 0.24.1. Close a review-discovered initial-request mismatch: retain an outgoing model that disagrees with host metadata, with no classifier call or later revival in that turn. No live-mode activation or provider entitlement claim.
+
 - Extend the ask-only decoded-shell pre-rule to standalone and absolute-path base64 decoders, macOS `-D`, shell basenames/absolute paths (`sh`, `bash`, `zsh`, `dash`, `ksh`) and a direct `env` shell wrapper. Fresh Jev 1.14 replay reproduced a `zsh` false approve before this change; keep the detector advisory and shadow behavior unchanged. Add no-network family/benign-boundary regressions. Qualification details and remaining promotion limits are in `evals/gate/QUALIFICATION-1.14.md`.
 
 ## 0.25.1
@@ -58,6 +60,12 @@ Released by the daily Jev steward: 15 commit(s) on main since v0.24.0.
 - Retain video QA frame and write-ahead attempt receipts (10beadc)
 - Record actual 40-home video QA default readback (e9e391c)
 - Wire truthful daily stewardship and counterbalance future A/B collections (d70ae3f)
+
+### Historical PR #51 proposal (2026-10-20; not released)
+
+- Bind cached routing decisions to provider, endpoint and model context; count actual request-model changes and add offline audit/evaluation tools. Custom identity enablement remains blocked pending host and gateway evidence. Prepared patch version; not deployed by this work.
+- Follow up PR #51 review: invalidate routing for the remainder of a changed-context turn, suppress stale routing/effort notices, distinguish audited installed 0.20.0 from repository base 0.24.0, and exclude synthetic/unclassified evaluation pairs while requiring structured cost and human-review provenance.
+
 
 ## 0.24.0 (2026-10-16)
 

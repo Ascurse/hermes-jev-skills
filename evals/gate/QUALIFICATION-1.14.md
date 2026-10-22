@@ -1,6 +1,6 @@
 # Jev 1.14 synthetic gate qualification
 
-This is candidate evidence, not installation or promotion approval. The shipped policies retain their existing calibration markers and the fleet install is unchanged.
+This records pre-installation candidate evidence, not policy-promotion authority. The shipped policies retain their existing calibration markers. Publishing or installing the guard/rescorer does not promote the private candidate policies or change a fleet mode.
 
 ## What was measured
 

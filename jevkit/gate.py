@@ -174,11 +174,24 @@ def _decoded_shell_pipe(command: str) -> bool:
         tokens = list(lexer)
     except ValueError:  # incomplete quoting: leave the host's normal approval flow intact
         return False
-    return any(tokens[i:i + 5] in (["|", "base64", "-d", "|", "sh"],
-                                    ["|", "base64", "-d", "|", "bash"],
-                                    ["|", "base64", "--decode", "|", "sh"],
-                                    ["|", "base64", "--decode", "|", "bash"])
-               for i in range(max(0, len(tokens) - 4)))
+    # Parse command positions rather than matching one literal five-token spelling.
+    # This is a bounded advisory detector, not a complete shell parser.
+    shell_names = {"sh", "bash", "zsh", "dash", "ksh"}
+    start = 0
+    for index, token in enumerate(tokens):
+        if token not in ("|", "|&", ";", "&&", "||", "&"):
+            continue
+        if token in ("|", "|&"):
+            left = tokens[start:index]
+            right = tokens[index + 1:]
+            if (left and Path(left[0]).name == "base64"
+                    and any(flag in left[1:] for flag in ("-d", "--decode", "-D"))):
+                if right and Path(right[0]).name == "env":
+                    right = right[1:]
+                if right and Path(right[0]).name in shell_names:
+                    return True
+        start = index + 1
+    return False
 
 
 def local_facts(command: Optional[str]) -> Dict[str, Any]:

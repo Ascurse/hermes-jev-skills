@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Extend the ask-only decoded-shell pre-rule to standalone and absolute-path base64 decoders, macOS `-D`, shell basenames/absolute paths (`sh`, `bash`, `zsh`, `dash`, `ksh`) and a direct `env` shell wrapper. Fresh Jev 1.14 replay reproduced a `zsh` false approve before this change; keep the detector advisory and shadow behavior unchanged. Add no-network family/benign-boundary regressions. Qualification details and remaining promotion limits are in `evals/gate/QUALIFICATION-1.14.md`.
+
 - Require a human prompt for a base64-decoded stream piped directly to sh/bash in the ask-only command gate. This local fact catches red-team fixture g005 without decoding, executing or forwarding its content; add a no-model regression and harmless-fixture guard. Shadow remains unchanged.
 
 ## 0.25.0 (2026-10-20)

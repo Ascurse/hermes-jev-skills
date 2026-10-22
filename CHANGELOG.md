@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Require a human prompt for a base64-decoded stream piped directly to sh/bash in the ask-only command gate. This local fact catches red-team fixture g005 without decoding, executing or forwarding its content; add a no-model regression and harmless-fixture guard. Shadow remains unchanged.
 - Integrate PR #49 (thanks @mxuanvan02) with explicit-effort preservation, disabled-reasoning and follow-up telemetry regressions. Retain the contributor commit in merge history; preserve manual `reasoning.effort` rather than replacing it. Include the numeric unknown-cost row count in daily stewardship summaries.
 
 - Add the tested opt-in bridge for existing daily stewardship collectors, separating root install identity from published main and exposing common-ledger estimates/unknowns. Counterbalance future A/B requests, while retaining the first exploratory run and its documented ordering deviation.

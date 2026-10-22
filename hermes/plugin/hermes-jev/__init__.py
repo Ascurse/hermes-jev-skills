@@ -490,6 +490,22 @@ def _on_llm_request(request: Optional[Dict[str, Any]] = None, session_id: str = 
         # Some Hermes paths hand us an already-prefixed model id; normalising here keeps
         # the decision string honest and keeps the pinned check comparing like with like.
         bare = model.split(":", 1)[1] if model.startswith((f"{catalog_provider}:", f"{provider}:")) else model
+        outgoing = request.get("model", model)
+        outgoing_bare = (outgoing.split(":", 1)[1]
+                         if isinstance(outgoing, str) and outgoing.startswith((f"{catalog_provider}:", f"{provider}:"))
+                         else outgoing)
+        if outgoing_bare != bare:
+            # Host metadata may lag a preceding middleware or explicit request choice.
+            # Unknown intent must retain the actual outgoing model, not buy a route.
+            with _LOCK:
+                turn["route_invalidated"] = True
+                turn.pop("effort", None)
+            _log({"kind": "route_effective", "mode": mode, "applied": False,
+                  "requested_model": outgoing, "effective_request_model": outgoing,
+                  "provider": provider, "provider_identity": None,
+                  "compatibility": "request_model_mismatch", "first_request": True,
+                  "reason": "outgoing model disagrees with host metadata; retaining request"})
+            return None
         current = f"{catalog_provider}:{bare}"
         default = _default_model()
         default_bare = str(default).split(":", 1)[-1] if default else ""

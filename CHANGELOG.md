@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Require a human prompt for a base64-decoded stream piped directly to sh/bash in the ask-only command gate. This local fact catches red-team fixture g005 without decoding, executing or forwarding its content; add a no-model regression and harmless-fixture guard. Shadow remains unchanged.
+
 ## 0.25.0 (2026-10-20)
 
 Released by the daily Jev steward: 15 commit(s) on main since v0.24.0.

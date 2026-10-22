@@ -28,6 +28,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
 
@@ -165,11 +166,27 @@ _CRITICAL_CONFIG_MOVE = re.compile(
 )
 
 
+def _decoded_shell_pipe(command: str) -> bool:
+    """Recognize a decoded stream fed directly to a shell, without decoding or executing it."""
+    try:
+        lexer = shlex.shlex(strip_comments(command), posix=True, punctuation_chars="|;&")
+        lexer.whitespace_split = True
+        tokens = list(lexer)
+    except ValueError:  # incomplete quoting: leave the host's normal approval flow intact
+        return False
+    return any(tokens[i:i + 5] in (["|", "base64", "-d", "|", "sh"],
+                                    ["|", "base64", "-d", "|", "bash"],
+                                    ["|", "base64", "--decode", "|", "sh"],
+                                    ["|", "base64", "--decode", "|", "bash"])
+               for i in range(max(0, len(tokens) - 4)))
+
+
 def local_facts(command: Optional[str]) -> Dict[str, Any]:
     """Facts code can compute about a command without asking anyone (never sent to Jev)."""
     # A key named after -i (ssh, scp, rsync -e "ssh -i ...") is used to log in, not read out.
     text = re.sub(r"(?:^|\s)-i\s+(?:\"[^\"]*\"|'[^']*'|\S+)", " ", strip_comments(command or ""))
     return {"credential_source": any(p.search(text) for p in CREDENTIAL_SOURCES),
+            "decoded_shell_pipe": _decoded_shell_pipe(command or ""),
             "critical_config_move": bool(_CRITICAL_CONFIG_MOVE.search(strip_comments(command or "")))}
 
 

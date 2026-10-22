@@ -4,6 +4,13 @@
 
 - Extend the ask-only decoded-shell pre-rule to standalone and absolute-path base64 decoders, macOS `-D`, shell basenames/absolute paths (`sh`, `bash`, `zsh`, `dash`, `ksh`) and a direct `env` shell wrapper. Fresh Jev 1.14 replay reproduced a `zsh` false approve before this change; keep the detector advisory and shadow behavior unchanged. Add no-network family/benign-boundary regressions. Qualification details and remaining promotion limits are in `evals/gate/QUALIFICATION-1.14.md`.
 
+## 0.25.1
+
+Development candidate; no release tag or policy promotion is implied.
+
+- Fix offline rescoring of `client.ask` score answers whose validated probability keys are integers. Normalize that representation only, retain strict score validation and duplicate-level refusal, preserve model-drift fallback and caller-owned data. Add offline round-trip, malformed-recording and drift regressions.
+- Publish a sanitized, frozen synthetic Jev 1.14 gate evaluation: 24 held-out and 118 development cases, zero false approvals, one harmless-case deferral. Retain the prior local-scoring failure in the 137-request accounting. No threshold, mode, `tuned_on` or privacy-boundary changes; no new paid calls.
+
 - Require a human prompt for a base64-decoded stream piped directly to sh/bash in the ask-only command gate. This local fact catches red-team fixture g005 without decoding, executing or forwarding its content; add a no-model regression and harmless-fixture guard. Shadow remains unchanged.
 
 ## 0.25.0 (2026-10-20)

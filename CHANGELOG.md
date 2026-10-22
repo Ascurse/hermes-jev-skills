@@ -59,6 +59,12 @@ Released by the daily Jev steward: 15 commit(s) on main since v0.24.0.
 - Record actual 40-home video QA default readback (e9e391c)
 - Wire truthful daily stewardship and counterbalance future A/B collections (d70ae3f)
 
+## 0.24.1 (2026-10-20)
+
+- Bind cached routing decisions to provider, endpoint and model context; count actual request-model changes and add offline audit/evaluation tools. Custom identity enablement remains blocked pending host and gateway evidence. Prepared patch version; not deployed by this work.
+- Follow up PR #51 review: invalidate routing for the remainder of a changed-context turn, suppress stale routing/effort notices, distinguish audited installed 0.20.0 from repository base 0.24.0, and exclude synthetic/unclassified evaluation pairs while requiring structured cost and human-review provenance.
+
+
 ## 0.24.0 (2026-10-16)
 
 Released by the daily Jev steward: 3 commit(s) on main since v0.23.1.

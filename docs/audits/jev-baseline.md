@@ -131,6 +131,12 @@ After any observed context mismatch, invalidation is sticky for that turn: an
 A -> B -> A callback sequence cannot revive A's decision. Repeated callbacks
 retain their incoming model and effort, without stale routing or effort notices.
 A fresh `pre_llm_call` creates independent state for the next turn.
+The first callback claims its binding under the state lock before classification.
+A simultaneous same-context follower keeps its original request while the decision
+is pending; a different-context follower invalidates the turn. Publication and the
+final model/effort commit both recheck the same live turn object, binding and
+invalidation state. A replaced turn (even with a reused turn ID) cannot receive an
+old callback's decision or effort. The lock is not held during classifier RPC.
 Endpoint comparison is conservative and in-memory only; even a benign URL change
 causes fallback. Existing string aliases remain operator assertions; nested named
 maps remain rejected. They are not newly certified as safe endpoint routing.
@@ -146,8 +152,8 @@ Acceptance is partial: no increased custom-provider routing is enabled. Existing
 pins, shadow behavior, namespace guards and effort capabilities are retained.
 Absolute guarantees against unsupported endpoint models cannot be established
 from an operator alias and a model catalog. Live inventory drift, credential
-rotation at an unchanged URL, same-turn concurrent first callbacks and upstream
-rewrites remain outside the patch's guarantee. Full provider-aware enablement is
+rotation at an unchanged URL and upstream rewrites remain outside the patch's
+guarantee. Full provider-aware enablement is
 blocked on trusted host identity plus execution validation.
 
 ## Quality evaluation framework
@@ -225,7 +231,7 @@ savings, execution-cost differences or end-to-end performance results in this wo
 | Shared custom class loses named identity | High enablement blocker | Host callback lacks named identity; retained fail-safe rejection |
 | Alias is an assertion, not entitlement validation | Medium residual | String alias trusts configured catalog namespace; no live enablement |
 | Gateway inventory and credential drift | Medium residual | Same URL cannot prove same entitlements; no gateway adapter introduced |
-| Concurrent first callbacks can duplicate classification | Medium residual | Lookup lock does not encompass RPC and decision publication; not claimed fixed |
+| Concurrent callbacks can publish stale routing or effort | High potential impact, resolved | Binding claimed before RPC; pending fallback and live-context rechecks guard publication and final commit; deterministic regressions cover both RPC and effort-selection races |
 | Savings attribution exceeds evidence | Low reporting risk | Applied flags are middleware observations; patch distinguishes actual assignment changes |
 
 Untrusted messages cannot supply the binding through request body fields; host

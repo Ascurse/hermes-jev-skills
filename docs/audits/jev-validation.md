@@ -1,6 +1,103 @@
 # Validation and independent review
 
-## PR #51 focused follow-up
+## Current final verification
+
+The worktree started clean on `codex/jev-routing-isolation` at `9ee6de0`, matching
+the published PR head. Existing audit, telemetry, provenance checks and prior
+fixes were preserved. This continuation adds a verified concurrency fix and its
+regressions; it does not install the branch or modify production configuration.
+
+### Three review findings
+
+1. **Version scopes verified:** installed plugin manifest still reads 0.20.0;
+   repository base `7b56de6` reads 0.24.0; branch library and plugin manifest both
+   read 0.24.1. The audit describes the historical installed snapshot, and the
+   proposed patch targets the newer repository base. Only non-secret version
+   metadata was read; live routing settings, credentials and messages were not.
+2. **Model and reasoning-effort isolation:** sequential A -> B -> A stays
+   invalidated until new turn state. Independent regression review additionally
+   reproduced a concurrent publication defect in `9ee6de0`: initial callbacks
+   could classify different contexts and commit stale model/effort changes.
+   The first context is now claimed before RPC, simultaneous followers keep their
+   original request, and publication plus final mutation revalidate live turn
+   object identity, binding and invalidation state under the lock. No global lock
+   is held during classifier RPC. First-request telemetry is assigned at admission,
+   so delayed and rejected callbacks retain the correct request denominator.
+3. **Evaluation separation:** synthetic, unclassified and mixed pairs remain
+   excluded from measured deltas. Execution evidence, recognized billing source
+   and receipt references, and structured human review remain required. These are
+   structurally validated caller attestations, not independently authenticated
+   executions, billing or human identities. No new measurement claims are made.
+
+### Executed checks
+
+Python 3.13.7 on macOS arm64, with `GIT_CONFIG_GLOBAL=/dev/null` and
+`GIT_CONFIG_NOSYSTEM=1` scoped to the test subprocesses:
+
+| Check | Actual result |
+|---|---|
+| `python3 -m unittest discover -s tests` | 1,633 passed, 34.337 seconds, exit 0 |
+| `python3 -m unittest discover -s router-dashboard/tests` | 71 passed, 2.155 seconds, exit 0 |
+| Total discovered tests | 1,704 passed |
+| `python3 scripts/check_release.py` | Passed, 340 text files; 56 existing binaries unscanned |
+| `git diff --check` | Passed |
+
+The core/dashboard suites emit ResourceWarnings for existing socket, file and
+database fixtures (28 and 12 warnings respectively). Expected negative-path test
+tracebacks also appear; neither suite reports a failed test. No tests were
+silently skipped to obtain these results. This is local evidence, not the
+repository's complete multi-OS/multi-Python CI matrix.
+
+### Independent review and safeguards
+
+Two independent read-only reviewers examined the complete scoped diff and the
+additional fix. The security reviewer ran 45 middleware plus 11 evaluation-tool
+tests successfully. The regression reviewer ran all 45 middleware tests with zero
+failures, errors or skips and substituted the previous callback in memory: the
+new concurrency tests produced eight expected failures, demonstrating that they
+catch the old routing and effort leaks. Both reviewers rechecked the fix and
+reported no remaining actionable issue.
+
+New tests exercise actual configured effort on Chat Completions and Responses,
+all four binding components (provider, endpoint, host model and outgoing model),
+pending first decisions, changes during `effort.pick`, turn replacement including
+reused IDs, and no duplicate simultaneous classifier calls. Existing pin,
+shadow, explicit-effort, disabled-reasoning, malformed-config, router-exception
+and custom-provider safeguards pass in the full suite.
+
+The complete base-to-worktree diff is restricted to the middleware, tests, audit
+and offline evaluation tools/docs, changelog and paired release metadata. No
+runtime configuration, production routing pool, dependency, deployment workflow
+or unrelated workspace change is included. Release/sensitive-pattern checks find
+no credential material; the credential-style URL in a regression is a deliberate
+`private-sentinel` fixture. No changed binary requires new visual inspection.
+
+### CI, publication gate and remaining limitations
+
+GitHub's `test` and `Windows CLI fallback` runs for published head `9ee6de0` are
+both `action_required`, not passing test results:
+
+- [Core CI approval required](https://github.com/kerpopule/hermes-jev-skills/actions/runs/39312596832)
+- [Windows CLI approval required](https://github.com/kerpopule/hermes-jev-skills/actions/runs/39312596723)
+
+The authenticated account has no write/admin permission on the upstream repository
+and cannot provide that maintainer approval. Because the requested publication
+gate requires all required checks to pass, this continuation is committed locally
+and its push/PR update is held while those CI runs require approval. The published
+PR remains at `9ee6de0`; this report and the updated PR-description artifact are
+prepared locally. Any later push requires CI validation of its exact new head
+before merge readiness is asserted. Local passing checks do not satisfy that
+cross-platform gate. No merge, deployment or Hermes restart was performed.
+
+The reproduced concurrency defect is resolved for guarded model/effort commits.
+Remaining architectural boundaries are unchanged: named custom identity is not
+provided reliably by the host; aliases remain operator assertions; credential or
+inventory drift at an unchanged endpoint cannot be certified; later middleware
+or gateways can rewrite requests; measurement provenance is caller-attested.
+Custom-provider enablement, end-to-end execution compatibility, measured savings
+and comparative quality remain unverified. PR #51 is not yet merge-ready.
+
+## Earlier PR #51 focused follow-up
 
 The review was limited to the three requested concerns. Before implementation,
 new regressions reproduced A -> B -> A cache revival (including stale notices)
@@ -27,12 +124,12 @@ and synthetic records entering measured deltas. Those regressions now pass.
   `git diff --check` passed. Existing upstream binaries remain unscanned and
   unchanged by this follow-up.
 
-The earlier 1,340 and 1,621 results below are historical checkpoints, not the
-current test count. Measurement evidence is structurally checked caller
+The 1,340, 1,621 and 1,628 results are historical checkpoints, not the current
+test count. Measurement evidence is structurally checked caller
 attestation; authenticity must be audited separately. No live compatibility,
 quality or savings claim is added, and no merge or deployment is authorized.
 
-## Final checks
+## Earlier implementation checks
 
 - After rebasing onto refreshed upstream 0.24.0: **1,621 tests passed**, exit 0,
   34.043 seconds with the same isolated Git environment. The branch release

@@ -12,3 +12,7 @@ state.json
 !evals/gate/fixtures.jsonl
 .venv/
 dist/
+.agents/
+skills-lock.json
+jev-ultrafast/
+jev-ultrafast

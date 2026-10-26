@@ -7,6 +7,10 @@ an applied model change only when the outgoing model actually differs.
 Invalidation lasts until the next turn, so A -> B -> A cannot revive a stale
 decision or routing/effort notice. Normal repeated requests in an unchanged
 context still reuse their decision.
+The binding is claimed before classification. Concurrent callbacks keep their
+original request while a same-context decision is pending, and context changes
+invalidate the turn even during an RPC. Decision publication and the final
+model/effort commit recheck the live turn object, binding and invalidation state.
 
 | Version scope | Version | Evidence |
 |---|---|---|
@@ -28,8 +32,15 @@ no live settings, inventory mappings or deployment changes are included.
 Validation and known limitations: see `jev-validation.md`. This change does not
 establish endpoint execution compatibility, quality improvements or savings.
 
-Focused follow-up validation: **1,628 tests passed** with global/system Git
-settings isolated for the test process; 40 middleware and 11 offline evaluation
-tests also passed separately. New regressions first reproduced both reported
-behavioral gaps, then passed after the fixes. Two independent read-only reviewers
-found no actionable issue. Earlier 1,340/1,621 test counts are historical checkpoints.
+Current local validation: **1,633 core tests and 71 dashboard tests passed**
+(1,704 total) on Python 3.13.7/macOS, with global/system Git settings isolated
+for the test process. Release scan (340 text files) and `git diff --check` passed.
+Two independent security/regression reviewers rechecked the concurrency fix and
+found no remaining actionable issue. The regression reviewer substituted the old
+callback into the new race tests and reproduced eight failures; all 45 current
+middleware tests pass. Earlier test totals are historical checkpoints.
+
+CI remains unverified: GitHub's `test` and `Windows CLI fallback` runs on the
+published head `9ee6de0` require maintainer approval (`action_required`). Local
+checks do not certify the Linux/Windows or other-Python matrix. No merge or
+deployment approval is implied.

@@ -552,6 +552,20 @@ class RoutingSwitchTests(PluginCase):
         self.assertEqual(len(self.route_log()), 1)
         self.assertEqual(len([e for e in self.log() if e["kind"] == "route_effective"]), 4)
 
+    def test_one_request_logs_one_route_effective_and_a_retry_logs_its_own(self):
+        self.switch(routing="shadow")
+        with mock.patch.object(plugin.route, "decide", return_value=dict(ROUTED)):
+            self.turn(self.request())
+            effective = [e for e in self.log() if e["kind"] == "route_effective"]
+            self.assertEqual(len(effective), 1)
+            self.assertTrue(effective[0]["first_request"])
+            # Hermes retries after a 429: a second middleware call, not a duplicate entry
+            plugin._on_llm_request(request=self.request(), session_id="s", turn_id="t1",
+                                   model=DEFAULT, provider="openrouter")
+        effective = [e for e in self.log() if e["kind"] == "route_effective"]
+        self.assertEqual([e["first_request"] for e in effective], [True, False])
+        self.assertEqual(len(self.route_log()), 1)
+
     def test_a_crash_inside_routing_lets_the_turn_through_and_is_logged_as_a_failure(self):
         self.switch(routing="on")
         with mock.patch.object(plugin.route, "decide", side_effect=KeyError("tiers")):

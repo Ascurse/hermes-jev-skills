@@ -305,6 +305,18 @@ class HermesShadow(TempHome):
         (self.home / "jev" / "LANES_OFF").write_text("")
         self.assertEqual(lane_shadow.tick(kanban_db=db, now=now, transport=fake)["mode"], "off")
 
+    def test_each_classified_card_lands_in_the_decision_log_with_its_lane(self):
+        from jevkit import lane_shadow
+        now = 2_000_000_000
+        db = self.make_board([("t_a", "Fix typo in README", "", "todo", "qa", now - 60, None, None)])
+        self.set_mode("shadow")
+        lane_shadow.tick(kanban_db=db, now=now,
+                         transport=Scripted({"lane": "small", "security_sensitive": 0.05, "underspecified": 0.1}))
+        path = self.home / "logs" / "jev-decisions.jsonl"
+        rows = [json.loads(l) for l in path.read_text().splitlines()]
+        self.assertEqual([(r["kind"], r["task"], r["lane"]) for r in rows], [("lane", "t_a", "small")])
+        self.assertNotIn("Fix typo", path.read_text())
+
 
 class Replay(unittest.TestCase):
     """The backtest reads history read-only, never sends text, and prices both sides the same way."""

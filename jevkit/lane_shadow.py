@@ -43,6 +43,20 @@ def log_path() -> Path:
     return root() / "logs" / "jev-lanes.jsonl"
 
 
+def decision_log_path() -> Path:
+    return root() / "logs" / "jev-decisions.jsonl"
+
+
+def _log_decision(entry: Mapping[str, Any]) -> None:
+    """Same file and line shape as the Hermes plugin's decision log; never the card's text."""
+    try:
+        fd = os.open(str(decision_log_path()), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        with os.fdopen(fd, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(dict(entry), separators=(",", ":")) + "\n")
+    except OSError:
+        pass
+
+
 def cursor_path() -> Path:
     return root() / "jev" / "lanes-shadow.cursor.json"
 
@@ -139,6 +153,8 @@ def tick(*, kanban_db: Optional[Path] = None, policy: str = DEFAULT_POLICY, now:
                 "had_override": bool(card.get("model_override") or card.get("reasoning_effort")),
                 "applied": did_apply,
             }, separators=(",", ":")) + "\n")
+            _log_decision({"ts": round(now, 3), "profile": card.get("assignee"), "kind": "lane", "mode": mode,
+                           "task": card["id"], "lane": lane, "target": target, "applied": did_apply})
     _write_cursor({"created_at": since, "ts": now})
     return {"mode": mode, "classified": sum(counts.values()), "lanes": counts, "applied": applied,
             "log": str(log_path())}

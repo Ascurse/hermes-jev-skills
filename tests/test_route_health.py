@@ -299,7 +299,9 @@ class DoctorTests(unittest.TestCase):
         catalog_models = mock.Mock(return_value=rows)
         out = io.StringIO()
         # An endpoint override changes what doctor asks and what its exit code means.
-        with mock.patch.dict(os.environ, {"TYPESAFE_BASE_URL": ""}), \
+        # Пустой HERMES_HOME: профили с машины разработчика не должны попадать в проверку.
+        with tempfile.TemporaryDirectory() as home, \
+                mock.patch.dict(os.environ, {"TYPESAFE_BASE_URL": "", "HERMES_HOME": home}), \
                 mock.patch.object(cli.route, "load_config", return_value=cfg), \
                 mock.patch.object(cli.keystore, "describe", return_value={"present": key}), \
                 mock.patch.object(cli, "_catalog_is_cached", return_value=cached), \
@@ -365,6 +367,70 @@ class DoctorTests(unittest.TestCase):
         self.assertIn("simple", tier_warning)
         self.assertIn("medium/coding", cell_warning)
         self.assertNotIn("simple/", cell_warning)
+
+
+
+class ProfileDoctorTests(unittest.TestCase):
+    """Doctor judges the pools as each Hermes profile sees them: through its own provider."""
+
+    POOLS = {"medium": {"general": ["or:flash-b", "x:a"], "coding": ["or:kcode"],
+                        "writing": ["x:w", "or:grok"], "research": ["or:grok"]}}
+
+    def doctor(self, layout):
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(root, ignore_errors=True))
+        for relative, text in layout.items():
+            path = root / "hermes" / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text if isinstance(text, str) else json.dumps(text), encoding="utf-8")
+        env = {"TYPESAFE_BASE_URL": "", "HERMES_HOME": str(root / "hermes"),
+               "XDG_CONFIG_HOME": str(root / "xdg"), "JEV_ROUTING_CONFIG": ""}
+        out = io.StringIO()
+        with mock.patch.dict(os.environ, env), \
+                mock.patch.object(cli.keystore, "describe", return_value={"present": True}), \
+                mock.patch.object(cli, "_catalog_is_cached", return_value=False), \
+                contextlib.redirect_stdout(out):
+            code = cli.main(["doctor", "--offline"])
+        return code, json.loads(out.getvalue())["routing"]
+
+    @staticmethod
+    def yaml(provider):
+        return f"model:\n  default: m\n  provider: {provider}\n  base_url: https://example.test\n"
+
+    def by_name(self, routing):
+        return {entry["profile"]: entry for entry in routing["profiles"]}
+
+    def test_a_profile_whose_provider_has_no_model_in_the_pools_is_unservable_everywhere(self):
+        code, routing = self.doctor({"config.yaml": self.yaml("or"), "jev/routing.json": {"tiers": self.POOLS},
+                                     "profiles/arch/config.yaml": self.yaml("anthropic")})
+        self.assertEqual(code, 0, "a pool that cannot serve a profile is a warning, not a failure")
+        profiles = self.by_name(routing)
+        self.assertEqual(profiles["default"]["provider"], "or")
+        self.assertEqual(profiles["default"]["unservable"], [])
+        self.assertEqual(profiles["default"]["dead"], [])
+        self.assertEqual(profiles["arch"]["provider"], "anthropic")
+        self.assertEqual(profiles["arch"]["unservable"],
+                         ["medium/general", "medium/coding", "medium/writing", "medium/research"])
+        warning = [w for w in routing["warnings"] if "arch" in w]
+        self.assertEqual(len(warning), 1)
+        self.assertIn("anthropic", warning[0])
+        self.assertFalse(any("default" in w for w in routing["warnings"]))
+
+    def test_a_profile_reads_its_own_pools_and_its_provider_through_the_hermes_alias(self):
+        own = {"tiers": {"medium": {"general": ["google:g1"], "coding": ["google:g1"],
+                                    "writing": ["google:g2"], "research": ["or:grok"]}}}
+        _, routing = self.doctor({"config.yaml": self.yaml("or"), "jev/routing.json": {"tiers": self.POOLS},
+                                  "profiles/runner/config.yaml": self.yaml("gemini"),
+                                  "profiles/runner/jev/routing.json": own})
+        runner = self.by_name(routing)["runner"]
+        self.assertEqual(runner["provider"], "google")
+        self.assertEqual(runner["unservable"], [])
+        self.assertEqual(runner["dead"], ["medium/coding", "medium/research"])
+        self.assertTrue(any("runner" in w and "medium/coding" in w for w in routing["warnings"]))
+
+    def test_no_hermes_config_means_no_profile_section(self):
+        _, routing = self.doctor({"jev/routing.json": {"tiers": self.POOLS}})
+        self.assertNotIn("profiles", routing)
 
 
 # ── the plugin ───────────────────────────────────────────────────────────────

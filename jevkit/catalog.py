@@ -36,6 +36,42 @@ def hermes_root() -> Path:
     return home.parent.parent if home.parent.name == "profiles" else home
 
 
+def _model_provider(text: str) -> Optional[str]:
+    """`model.provider` из config.yaml Hermes. Не YAML-парсер: нужен один ключ одного известного файла."""
+    inside = False
+    for line in text.splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if not line[0].isspace():
+            inside = line.split("#", 1)[0].strip() == "model:"
+            continue
+        key, sep, value = line.strip().partition(":")
+        if inside and sep and key == "provider":
+            value = value.split("#", 1)[0].strip().strip("'\"")
+            return value or None
+    return None
+
+
+def hermes_profiles() -> Dict[str, Dict[str, Any]]:
+    """{profile: {"home": Path, "provider": hermes provider name}} for every Hermes profile with a provider.
+
+    The root folder is the profile Hermes calls "default"; the rest live in <root>/profiles/<name>.
+    """
+    root = hermes_root()
+    homes = [("default", root)]
+    if (root / "profiles").is_dir():
+        homes += sorted((home.name, home) for home in (root / "profiles").iterdir() if home.is_dir())
+    found: Dict[str, Dict[str, Any]] = {}
+    for name, home in homes:
+        try:
+            provider = _model_provider((home / "config.yaml").read_text(encoding="utf-8", errors="replace"))
+        except OSError:
+            continue
+        if provider:
+            found[name] = {"home": home, "provider": provider}
+    return found
+
+
 def _cache_path() -> Path:
     base = os.environ.get("XDG_CACHE_HOME") or str(Path.home() / ".cache")
     return Path(base) / "jev" / "models_dev.json"

@@ -149,6 +149,57 @@ def _routing_health(config: Dict[str, Any], rows: Optional[List[Dict[str, Any]]]
     return out
 
 
+def _catalog_provider(provider: str, config: Dict[str, Any]) -> str:
+    """The models.dev provider a Hermes profile's turns are limited to, as the plugin resolves it."""
+    if provider == "custom":
+        aliases = config.get("provider_aliases")
+        alias = aliases.get("custom") if isinstance(aliases, dict) else None
+        return alias if isinstance(alias, str) and alias and ":" not in alias else "custom"
+    return catalog.HERMES_ALIASES.get(provider, provider)
+
+
+def _profile_health() -> Dict[str, Any]:
+    """The pools as each Hermes profile sees them.
+
+    The plugin only swaps the model inside the provider a profile is connected to, so a
+    pool full of other providers' models is, for that profile, no pool at all. Checked
+    without a provider the same pools can look healthy.
+    """
+    profiles: List[Dict[str, Any]] = []
+    warnings: List[str] = []
+    for name, found in catalog.hermes_profiles().items():
+        config = route.load_config(home=found["home"])
+        provider = _catalog_provider(found["provider"], config)
+        unservable: List[str] = []
+        dead: List[str] = []
+        general_named = set()
+        for cell in route.specialty_cells(config, only_provider=provider):
+            tier = cell["tier"]
+            if cell["general"] is None and tier not in general_named:
+                general_named.add(tier)
+                unservable.append(f"{tier}/general")
+            if cell["model"] is None:
+                unservable.append(f"{tier}/{cell['specialty']}")
+            elif cell["dead"]:
+                dead.append(f"{tier}/{cell['specialty']}")
+        profiles.append({"profile": name, "provider": provider, "unservable": unservable, "dead": dead})
+        if unservable:
+            warnings.append(
+                f"profile {name} runs on {provider}, and no {provider} model is usable in {_names(unservable)}: "
+                f"on those turns the router keeps the current model and Jev's answer is paid for and unused. "
+                f"Add {provider} models to those pools, or give the profile its own routing.json.")
+        if dead:
+            warnings.append(
+                f"profile {name} ({provider}): {_names(dead)} resolve to the same {provider} model as their "
+                f"tier's general pool, so the 'what kind of work is this?' answer cannot change the model.")
+    out: Dict[str, Any] = {}
+    if profiles:
+        out["profiles"] = profiles
+    if warnings:
+        out["profile_warnings"] = warnings
+    return out
+
+
 def _override_endpoint() -> Optional[Dict[str, Any]]:
     """What TYPESAFE_BASE_URL points at, if it overrides the official endpoint.
 
@@ -195,6 +246,13 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         except Exception as error:  # noqa: BLE001 - a routing.json odd enough to break a check is itself the finding
             report["routing"]["warnings"] = [f"the routing checks could not run ({type(error).__name__}); "
                                              f"the pools were NOT checked. Look at {route.config_path()}."]
+    try:
+        by_profile = _profile_health()
+    except Exception as error:  # noqa: BLE001 - doctor reports a problem, it must not become one
+        by_profile = {"profile_warnings": [f"the per-profile routing checks could not run ({type(error).__name__})."]}
+    report["routing"].update({k: v for k, v in by_profile.items() if k != "profile_warnings"})
+    if by_profile.get("profile_warnings"):
+        report["routing"]["warnings"] = report["routing"].get("warnings", []) + by_profile["profile_warnings"]
     report["hermes_home"] = str(catalog.hermes_home()) if catalog.hermes_home().is_dir() else None
     _out(report)
     # Only a missing key fails doctor. The routing findings are warnings about cost: an

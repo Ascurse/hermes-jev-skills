@@ -71,16 +71,20 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 }
 
 
-def config_paths() -> List[Path]:
-    """Least specific first. The shared file is the default for every Hermes profile; a profile's own file overrides it."""
+def config_paths(home: Optional[Path] = None) -> List[Path]:
+    """Least specific first. The shared file is the default for every Hermes profile; a profile's own file overrides it.
+
+    `home` asks for another profile's layers than the one this process runs as.
+    """
     override = os.environ.get("JEV_ROUTING_CONFIG")
     if override:
         return [Path(override)]
+    home = home or catalog_mod.hermes_home()
     paths = [Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "jev" / "routing.json"]
     if catalog_mod.hermes_root().is_dir():
         paths.append(catalog_mod.hermes_root() / "jev" / "routing.json")
-        if catalog_mod.hermes_home() != catalog_mod.hermes_root():
-            paths.append(catalog_mod.hermes_home() / "jev" / "routing.json")
+        if home != catalog_mod.hermes_root():
+            paths.append(home / "jev" / "routing.json")
     return paths
 
 
@@ -89,9 +93,9 @@ def config_path() -> Path:
     return config_paths()[-1]
 
 
-def load_config(path: Optional[Path] = None) -> Dict[str, Any]:
+def load_config(path: Optional[Path] = None, home: Optional[Path] = None) -> Dict[str, Any]:
     config = json.loads(json.dumps(DEFAULT_CONFIG))
-    for candidate in ([path] if path else config_paths()):
+    for candidate in ([path] if path else config_paths(home)):
         try:
             layer = json.loads(candidate.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):

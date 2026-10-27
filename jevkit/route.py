@@ -155,16 +155,40 @@ def suggest_tiers(rows: List[Dict[str, Any]], exclude: List[str], per_pool: int 
     out: Dict[str, Dict[str, List[str]]] = {}
     for tier, (low, high) in bands.items():
         pool = sorted((r for r in usable if low <= r["price"] < high), key=lambda r: r["released"], reverse=True)
+        # A specialist leading general made its own specialty pool lead with the same model,
+        # so the kind answer could not change the pick. Generalists go first when there are any.
+        generalists = [r for r in pool if not _specialist(r)]
+        general = generalists + [r for r in pool if r not in generalists]
         tier_pools: Dict[str, List[str]] = {
-            "general": [_ref(r) for r in pool[:per_pool]],
+            "general": [_ref(r) for r in general[:per_pool]],
             "vision": [_ref(r) for r in pool if r["vision"]][:per_pool],
         }
         for specialty, hints in _SPECIALTY_HINTS.items():
             named = [r for r in pool if any(h in r["model"].lower() for h in hints)]
-            rest = [r for r in pool if r not in named]
+            if general and named and named[0] is general[0] and len(named) > 1:
+                named = named[1:] + named[:1]
+            rest = [r for r in general if r not in named]
             tier_pools[specialty] = [_ref(r) for r in (named + rest)[:per_pool]]
         out[tier] = tier_pools
     return out
+
+
+def _specialist(row: Dict[str, Any]) -> bool:
+    return any(h in row["model"].lower() for hints in _SPECIALTY_HINTS.values() for h in hints)
+
+
+def suggest_duplicates(tiers: Dict[str, Dict[str, List[str]]]) -> List[Dict[str, Any]]:
+    """Suggested specialty pools that still lead with their tier's general model.
+
+    `suggest_tiers` only puts a model first in a specialty pool when its name says it does
+    that work. When no model in the price band does, the pool falls back to the general
+    order and the duplicate is unavoidable. Putting an arbitrary other model first would
+    silence `doctor` without making the kind answer mean anything, so this says it instead.
+    """
+    return [{"tier": c["tier"], "specialty": c["specialty"], "model": c["model"],
+             "why": "no model in this tier's price band names this specialty, so a duplicate of "
+                    "the general lead is unavoidable; pin a model by hand or accept the cost"}
+            for c in specialty_cells({"tiers": tiers}) if c["dead"]]
 
 
 # The specialties Jev's `kind` answer can actually select. `vision` is not one: images are

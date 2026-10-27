@@ -2102,6 +2102,45 @@ class SpecializationAxisTests(unittest.TestCase):
         tiers = route.suggest_tiers(self.ROWS, exclude=[])
         self.assertTrue(tiers["simple"]["writing"], "a hint must order a pool, not filter it")
 
+    def test_a_specialist_does_not_lead_general_when_a_generalist_exists(self):
+        """cheap-coder is the newest simple model. Leading general with it made the coding
+        pool resolve to the same model as general, so the kind answer could not matter."""
+        tiers = route.suggest_tiers(self.ROWS, exclude=[])
+        self.assertTrue(tiers["simple"]["general"][0].endswith("cheap-general"))
+        self.assertNotEqual(tiers["simple"]["coding"][0], tiers["simple"]["general"][0])
+
+    def test_suggest_names_every_pool_whose_duplicate_lead_is_unavoidable(self):
+        tiers = route.suggest_tiers(self.ROWS, exclude=[])
+        dupes = {(d["tier"], d["specialty"]) for d in route.suggest_duplicates(tiers)}
+        # No simple model names writing or research, no hard model names any specialty.
+        self.assertIn(("simple", "writing"), dupes)
+        self.assertIn(("simple", "research"), dupes)
+        self.assertIn(("hard", "writing"), dupes)
+        self.assertIn(("hard", "research"), dupes)
+        self.assertNotIn(("simple", "coding"), dupes)
+
+    def test_every_suggested_duplicate_is_reported(self):
+        tiers = route.suggest_tiers(self.ROWS, exclude=[])
+        reported = {(d["tier"], d["specialty"]) for d in route.suggest_duplicates(tiers)}
+        actual = {(c["tier"], c["specialty"]) for c in route.specialty_cells({"tiers": tiers}) if c["dead"]}
+        self.assertEqual(reported, actual)
+
+    def test_models_suggest_prints_the_unavoidable_duplicates(self):
+        import contextlib
+        import io
+        from jevkit import cli
+        rows =[dict(r, name=r["model"], context=0) for r in self.ROWS]
+        with mock.patch.object(cli.catalog, "load_models_dev", return_value={}), \
+             mock.patch.object(cli.catalog, "models", return_value=rows), \
+             mock.patch.object(cli.route, "load_config", return_value={"exclude": []}):
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                cli.main(["models", "suggest"])
+        out = json.loads(buffer.getvalue())
+        dupes = {(d["tier"], d["specialty"]) for d in out["unavoidable_duplicates"]}
+        self.assertIn(("hard", "writing"), dupes)
+        self.assertTrue(all("unavoidable" in d["why"] for d in out["unavoidable_duplicates"]))
+
     def test_dead_axis_names_tiers_whose_specialty_answer_is_discarded(self):
         collapsed = {"tiers": {"simple": {"general": ["a:b"], "vision": ["a:c"]},
                                "hard": {"general": ["a:d"], "coding": ["a:e"]}}}

@@ -219,13 +219,15 @@ def cmd_models(args: argparse.Namespace) -> int:
             rows = [r for r in rows if args.search.lower() in (r["model"] + r["name"]).lower()]
         return _out({"count": len(rows), "models": rows})
     tiers = route.suggest_tiers(rows, config["exclude"])
+    duplicates = route.suggest_duplicates(tiers)
     if args.write:
         config["tiers"] = tiers
         path = route.config_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
-        return _out({"written": str(path), "tiers": tiers})
-    return _out({"suggested_tiers": tiers, "note": "add --write to save, then edit the pools to taste"})
+        return _out({"written": str(path), "tiers": tiers, "unavoidable_duplicates": duplicates})
+    return _out({"suggested_tiers": tiers, "unavoidable_duplicates": duplicates,
+                 "note": "add --write to save, then edit the pools to taste"})
 
 
 def cmd_route(args: argparse.Namespace) -> int:

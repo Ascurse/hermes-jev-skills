@@ -428,6 +428,19 @@ class ProfileDoctorTests(unittest.TestCase):
         self.assertEqual(runner["dead"], ["medium/coding", "medium/research"])
         self.assertTrue(any("runner" in w and "medium/coding" in w for w in routing["warnings"]))
 
+    def test_a_profile_declared_single_model_keeps_its_dead_cells_but_drops_the_warning(self):
+        pools = {"medium": {"general": ["anthropic:s"], "coding": ["anthropic:s"],
+                            "writing": ["anthropic:s"], "research": ["anthropic:s"]}}
+        config = {"tiers": pools, "single_model_profiles": ["arch"]}
+        _, routing = self.doctor({"config.yaml": self.yaml("anthropic"), "jev/routing.json": config,
+                                  "profiles/arch/config.yaml": self.yaml("anthropic")})
+        profiles = self.by_name(routing)
+        self.assertEqual(profiles["arch"]["dead"], ["medium/coding", "medium/writing", "medium/research"])
+        self.assertTrue(profiles["arch"]["single_model"])
+        self.assertFalse(any("profile arch " in w for w in routing.get("warnings", [])))
+        self.assertFalse(profiles["default"].get("single_model", False))
+        self.assertTrue(any("default" in w and "medium/coding" in w for w in routing["warnings"]))
+
     def test_no_hermes_config_means_no_profile_section(self):
         _, routing = self.doctor({"jev/routing.json": {"tiers": self.POOLS}})
         self.assertNotIn("profiles", routing)

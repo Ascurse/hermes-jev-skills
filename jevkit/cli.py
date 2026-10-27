@@ -182,13 +182,16 @@ def _profile_health() -> Dict[str, Any]:
                 unservable.append(f"{tier}/{cell['specialty']}")
             elif cell["dead"]:
                 dead.append(f"{tier}/{cell['specialty']}")
-        profiles.append({"profile": name, "provider": provider, "unservable": unservable, "dead": dead})
+        # Профиль, объявленный одномодельным, сознательно не различает тип работы.
+        single_model = name in (config.get("single_model_profiles") or [])
+        profiles.append({"profile": name, "provider": provider, "unservable": unservable, "dead": dead,
+                         "single_model": single_model})
         if unservable:
             warnings.append(
                 f"profile {name} runs on {provider}, and no {provider} model is usable in {_names(unservable)}: "
                 f"on those turns the router keeps the current model and Jev's answer is paid for and unused. "
                 f"Add {provider} models to those pools, or give the profile its own routing.json.")
-        if dead:
+        if dead and not single_model:
             warnings.append(
                 f"profile {name} ({provider}): {_names(dead)} resolve to the same {provider} model as their "
                 f"tier's general pool, so the 'what kind of work is this?' answer cannot change the model.")

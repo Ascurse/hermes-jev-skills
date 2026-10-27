@@ -1271,6 +1271,51 @@ class SpendTests(unittest.TestCase):
         self.assertEqual((b.requests, b.input_tokens, b.output_tokens, b.cost_usd, b.source),
                          (1, 50, 10, 1.25, "metered"))
 
+    def test_hermes_collector_falls_back_to_hermes_estimate_and_marks_the_basis(self):
+        """Hermes leaves actual_cost_usd at 0 and writes its estimate beside it. Reading only
+        the actual column priced a week of opus turns at $0.00."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.db"
+            conn = sqlite3.connect(path)
+            conn.execute("""create table session_model_usage (
+                model text, billing_provider text, billing_mode text, api_call_count integer,
+                input_tokens integer, output_tokens integer, actual_cost_usd real,
+                estimated_cost_usd real, last_seen real)""")
+            conn.executemany("insert into session_model_usage values (?,?,?,?,?,?,?,?,?)", [
+                ("billed", "p", "", 1, 10, 1, 0.5, 0.4, 110),
+                ("guessed", "p", "", 2, 20, 2, 0, 0.75, 110),
+                ("guessed", "p", "", 3, 30, 3, 0, 0.25, 120),
+                ("dark", "p", "", 4, 40, 4, 0, 0, 110),
+            ])
+            conn.commit()
+            conn.close()
+            rows = spend.from_hermes_sessions(str(path), since=100)
+        by_model = {r.model: r for r in rows}
+        self.assertEqual((by_model["p:billed"].cost_usd, by_model["p:billed"].cost_basis), (0.5, "billed"))
+        self.assertEqual((by_model["p:guessed"].cost_usd, by_model["p:guessed"].cost_basis), (1.0, "estimated"))
+        self.assertEqual(by_model["p:guessed"].requests, 5)
+        self.assertEqual((by_model["p:dark"].cost_usd, by_model["p:dark"].cost_basis), (0.0, "unknown"))
+
+    def test_report_prices_unknown_usage_from_the_catalogue_and_keeps_billed_apart(self):
+        rows = [spend.Usage("or:cheap", requests=1, input_tokens=1_000_000, output_tokens=1_000_000,
+                            cost_usd=2.0, cost_basis="billed"),
+                spend.Usage("or:dear", requests=2, input_tokens=100, output_tokens=0,
+                            cost_usd=0.3, cost_basis="estimated"),
+                spend.Usage("or:dear", requests=3, input_tokens=1_000_000, output_tokens=0,
+                            cost_usd=0.0, cost_basis="unknown"),
+                spend.Usage("or:nowhere", requests=4, input_tokens=1_000_000, output_tokens=0,
+                            cost_usd=0.0, cost_basis="unknown")]
+        data = spend.report(rows, prices=self.PRICES)
+        self.assertAlmostEqual(data["spend"]["metered_usd"], 2.0, places=2)        # still only what was billed
+        self.assertAlmostEqual(data["spend"]["estimated_usd"], 3.3, places=2)      # 0.3 Hermes + 3.0 catalogue
+        self.assertEqual(data["spend"]["estimated_by"], {"hermes": 0.3, "catalog": 3.0})
+        self.assertEqual(data["spend"]["unpriced_requests"], 4)
+        dear = next(e for e in data["by_model"] if e["model"] == "or:dear")
+        self.assertAlmostEqual(dear["cost_usd"], 3.3, places=2)
+        self.assertEqual(dear["cost_basis"], ["catalog", "estimated"])
+        nowhere = next(e for e in data["by_model"] if e["model"] == "or:nowhere")
+        self.assertEqual(nowhere["cost_basis"], ["unknown"])
+
     def test_hermes_collector_uses_legacy_messages_when_new_table_is_absent(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "state.db"

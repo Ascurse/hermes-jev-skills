@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
 
@@ -42,6 +42,9 @@ class Usage:
     source: str = "metered"        # "metered" | "subscription"
     seat: Optional[str] = None     # which flat-fee seat, when source == "subscription"
     label: Optional[str] = None    # lane / api key, when known
+    # Where cost_usd came from: "billed", "estimated" (the agent's own estimate),
+    # "catalog" (priced here from list prices) or "unknown" (cost_usd is 0 for lack of data).
+    cost_basis: str = "billed"
 
     @property
     def tokens(self) -> int:
@@ -151,21 +154,27 @@ def report(
 ) -> Dict[str, Any]:
     """The weekly picture: what ran, what it cost, and whether anything was a better deal."""
     prices = prices or price_table()
+    rows = [_with_catalogue_price(r, prices) for r in rows]
     metered = [r for r in rows if r.source == "metered"]
     subscription = [r for r in rows if r.source == "subscription"]
-    spent = sum(r.cost_usd for r in metered)
+    spent = sum(r.cost_usd for r in metered if r.cost_basis == "billed")
+    estimated_by = {"hermes": round(sum(r.cost_usd for r in metered if r.cost_basis == "estimated"), 4),
+                    "catalog": round(sum(r.cost_usd for r in metered if r.cost_basis == "catalog"), 4)}
+    estimated = estimated_by["hermes"] + estimated_by["catalog"]
 
     by_model: Dict[str, Dict[str, Any]] = {}
     for row in rows:
         entry = by_model.setdefault(row.model, {"model": row.model, "source": row.source, "requests": 0,
                                                 "input_tokens": 0, "output_tokens": 0, "cache_read_tokens": 0,
-                                                "cache_write_tokens": 0, "cost_usd": 0.0})
+                                                "cache_write_tokens": 0, "cost_usd": 0.0, "cost_basis": []})
         entry["requests"] += row.requests
         entry["input_tokens"] += row.input_tokens
         entry["output_tokens"] += row.output_tokens
         entry["cache_read_tokens"] += row.cache_read_tokens
         entry["cache_write_tokens"] += row.cache_write_tokens
         entry["cost_usd"] = round(entry["cost_usd"] + row.cost_usd, 4)
+        if row.cost_basis not in entry["cost_basis"]:
+            entry["cost_basis"] = sorted(entry["cost_basis"] + [row.cost_basis])
     for entry in by_model.values():
         tokens = entry["input_tokens"] + entry["output_tokens"]
         entry["per_m_effective"] = round(entry["cost_usd"] / (tokens / 1e6), 4) if tokens else None
@@ -190,6 +199,9 @@ def report(
         "window_days": days,
         "spend": {
             "metered_usd": round(spent, 2),
+            "estimated_usd": round(estimated, 2),
+            "estimated_by": estimated_by,
+            "unpriced_requests": sum(r.requests for r in metered if r.cost_basis == "unknown"),
             "subscription_fees_usd": round(seat_fees, 2),
             "total_usd": round(spent + seat_fees, 2),
             "requests": sum(r.requests for r in rows),
@@ -207,6 +219,17 @@ def report(
         "caveat": ("Counterfactuals price the tokens that were actually produced. A model that reasons more "
                    "or less would not have produced the same tokens, so treat them as a floor, not a promise."),
     }
+
+
+def _with_catalogue_price(row: Usage, prices: Mapping[str, Mapping[str, float]]) -> Usage:
+    """Metered usage nobody priced gets a list-price estimate, marked as one.
+
+    The catalogue has no cache prices, so this is a floor: cache reads and writes are left out.
+    """
+    if row.source != "metered" or row.cost_basis != "unknown":
+        return row
+    cost = cost_of(row, row.model, prices)
+    return row if cost is None else replace(row, cost_usd=cost, cost_basis="catalog")
 
 
 def _verdict(spent: float, best: Optional[Mapping[str, Any]], seats: Sequence[Mapping[str, Any]]) -> str:
@@ -269,6 +292,15 @@ def from_hermes_sessions(state_db: str, *, since: Optional[float] = None, label:
         needed = {"model", "billing_provider", "billing_mode", "api_call_count",
                   "input_tokens", "output_tokens", "actual_cost_usd", "last_seen"}
         if needed <= columns:
+            # Hermes leaves actual_cost_usd at 0 and records its own estimate beside it.
+            if "estimated_cost_usd" in columns:
+                basis = ("case when actual_cost_usd > 0 then 'billed' "
+                         "when estimated_cost_usd > 0 then 'estimated' else 'unknown' end")
+                cost = ("case when actual_cost_usd > 0 then actual_cost_usd "
+                        "else estimated_cost_usd end")
+            else:
+                basis = "case when actual_cost_usd > 0 then 'billed' else 'unknown' end"
+                cost = "actual_cost_usd"
             # These are cumulative session/model rows, not individual calls. Last-seen
             # selects sessions active in the window; a session crossing its boundary
             # contributes its whole total (the schema cannot split those tokens).
@@ -276,11 +308,12 @@ def from_hermes_sessions(state_db: str, *, since: Optional[float] = None, label:
             cache_write = "sum(cache_write_tokens)" if "cache_write_tokens" in columns else "0"
             query = f"""select model, billing_provider, billing_mode,
                         sum(api_call_count) as calls, sum(input_tokens) as in_t,
-                        sum(output_tokens) as out_t, sum(actual_cost_usd) as cost,
-                        {cache_read} as cache_read, {cache_write} as cache_write
+                        sum(output_tokens) as out_t, sum({cost}) as cost,
+                        {cache_read} as cache_read, {cache_write} as cache_write,
+                        {basis} as basis
                        from session_model_usage
                        where last_seen > ? and model is not null
-                       group by model, billing_provider, billing_mode"""
+                       group by model, billing_provider, billing_mode, basis"""
             return [Usage(
                 model=(f"{row['billing_provider']}:{row['model']}"
                        if row["billing_provider"] else str(row["model"])),
@@ -290,7 +323,7 @@ def from_hermes_sessions(state_db: str, *, since: Optional[float] = None, label:
                 cache_write_tokens=int(row["cache_write"] or 0),
                 cost_usd=float(row["cost"] or 0),
                 source=("subscription" if row["billing_mode"] == "subscription_included"
-                        else "metered"), label=label,
+                        else "metered"), label=label, cost_basis=row["basis"],
             ) for row in conn.execute(query, (since,))]
 
         columns = {r[1] for r in conn.execute("pragma table_info(messages)")}
@@ -318,6 +351,10 @@ def render(data: Mapping[str, Any]) -> str:
              f"  metered        ${s['metered_usd']:>10,.2f}",
              f"  seat fees      ${s['subscription_fees_usd']:>10,.2f}",
              f"  total          ${s['total_usd']:>10,.2f}   ({s['requests']:,} requests, {s['tokens']:,} tokens)"]
+    if s.get("estimated_usd"):
+        lines.append(f"  estimated      ${s['estimated_usd']:>10,.2f}   (not billed: {s['estimated_by']['hermes']:,.2f} "
+                     f"Hermes estimate, {s['estimated_by']['catalog']:,.2f} list price without cache; "
+                     f"{s['unpriced_requests']:,} requests unpriced)")
     if s.get("cache_read_tokens") or s.get("cache_write_tokens"):
         lines.append(f"  cache          {s['cache_read_tokens']:,} read, {s['cache_write_tokens']:,} write tokens (separate from input/output)")
     if data["by_model"]:

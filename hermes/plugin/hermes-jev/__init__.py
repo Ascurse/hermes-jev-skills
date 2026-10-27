@@ -31,11 +31,13 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
 from .jevkit import catalog, choose, compact, effort, keystore, ladder, rerank, route, search, skillpick, supervise, turn, webscreen
-from .jevkit import cloud_vision, decide as policy_engine, evaluate, gate, omni_vision, policy as policies, route_to, shadowq, switches
+from .jevkit import cloud_vision, decide as policy_engine, evaluate, gate, omni_vision, policy as policies, privacy, route_to, shadowq, switches
 
 _LOCK = threading.Lock()
 _TURNS: Dict[str, Dict[str, Any]] = {}      # session_id -> the current turn's text and decision
 _MAX_SESSIONS = 256
+_TASK_CHARS = 200        # how much of the turn a log entry may hold, after redaction
+_NO_LANE = "none"        # per-turn routing picks a tier, not a jev-lane-* agent
 _CTX: Any = None
 
 
@@ -83,12 +85,26 @@ def _profile() -> str:
     return home.name if home.parent.name == "profiles" else "default"
 
 
+def _turn_fields(text: str) -> Dict[str, Any]:
+    """The turn's opening for the log: redacted and cut to _TASK_CHARS.
+
+    The privacy boundary is the merged request's: a private profile, a features-only
+    config or a turn that looks sensitive logs no text at all.
+    """
+    try:
+        private = turn.mergeable(text, profile=_profile()) is not None
+    except Exception:  # noqa: BLE001  unreadable config: hold no text rather than guess
+        private = True
+    task = None if private else privacy.redact(text, limit=_TASK_CHARS)[:_TASK_CHARS]
+    return {"task": task, "lane": _NO_LANE}
+
+
 def _log(entry: Dict[str, Any]) -> None:
-    """Decisions only. Never prompt text, never model output."""
+    """Decisions, plus the turn's redacted opening where _turn_fields allowed it. Never model output."""
     try:
         path = _home() / "logs" / "jev-decisions.jsonl"
         path.parent.mkdir(parents=True, exist_ok=True)
-        entry = {"ts": round(time.time(), 3), "profile": _profile(), **entry}
+        entry = {"ts": round(time.time(), 3), "profile": _profile(), "task": None, "lane": _NO_LANE, **entry}
         fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
         with os.fdopen(fd, "a", encoding="utf-8") as handle:
             handle.write(json.dumps(entry, separators=(",", ":")) + "\n")
@@ -239,22 +255,23 @@ def _on_pre_llm_call(session_id: str = "", turn_id: Any = None, user_message: An
             picked = skillpick.pick(text, skills, top_k=1, stage_one=merged["stage_one"],
                                     stage_one_latency=merged.get("latency_ms"))
             _log({"kind": "merged", "status": "ok", "latency_ms": merged.get("latency_ms"),
-                  "picked": [s["name"] for s in picked.get("skills", [])]})
+                  "picked": [s["name"] for s in picked.get("skills", [])], **_turn_fields(text)})
         elif merged.get("status") == "fail_open":
             # Jev did not answer. Nothing is stored and routing asks on its own rather than
             # the turn losing its routing decision to somebody else's failed request.
-            _log({"kind": "merged", "status": "fail_open", "reason": merged.get("reason")})
+            _log({"kind": "merged", "status": "fail_open", "reason": merged.get("reason"), **_turn_fields(text)})
             return None
         else:
             # `not_mergeable` is the privacy boundary: those turns keep the two calls they had.
-            _log({"kind": "merged", "status": merged.get("status"), "reason": merged.get("reason")})
+            _log({"kind": "merged", "status": merged.get("status"), "reason": merged.get("reason"),
+                  **_turn_fields(text)})
     if picked is None:
         if not skills_on:
             return None
         picked = skillpick.pick(text, skills, top_k=1)
     _log({"kind": "skill", "status": picked.get("status"), "needs_skill": picked.get("needs_skill"),
           "picked": [s["name"] for s in picked.get("skills", [])], "latency_ms": picked.get("latency_ms"),
-          "reason_code": _skill_failure_code(picked)})
+          "reason_code": _skill_failure_code(picked), **_turn_fields(text)})
     if not picked.get("skills"):
         return None
     skill = picked["skills"][0]
@@ -448,9 +465,10 @@ def _with_effort(request: Dict[str, Any], level: str) -> Dict[str, Any]:
 
 
 def _keep_routing_request(request: Dict[str, Any], model: str, provider: str,
-                          mode: str, first_request: bool, reason: str) -> None:
+                          mode: str, first_request: bool, reason: str,
+                          fields: Optional[Dict[str, Any]] = None) -> None:
     """Record a non-mutating fallback without retaining/logging the endpoint."""
-    _log({"kind": "route_effective", "mode": mode, "applied": False,
+    _log({**(fields or {}), "kind": "route_effective", "mode": mode, "applied": False,
           "requested_model": request.get("model", model),
           "effective_request_model": request.get("model", model),
           "provider": provider, "provider_identity": None,
@@ -486,10 +504,11 @@ def _on_llm_request(request: Optional[Dict[str, Any]] = None, session_id: str = 
         pending = turn.get("route_inflight", False)
         if not invalidated and not pending and decision is None:
             turn["route_inflight"] = True
+    fields = _turn_fields(turn["text"])
     if invalidated:
-        return _keep_routing_request(request, model, provider, mode, first_request, "request_context_changed")
+        return _keep_routing_request(request, model, provider, mode, first_request, "request_context_changed", fields)
     if pending:
-        return _keep_routing_request(request, model, provider, mode, first_request, "routing_decision_pending")
+        return _keep_routing_request(request, model, provider, mode, first_request, "routing_decision_pending", fields)
     route_answers: Any = None
     if decision is None:                       # first API call of this turn: ask Jev exactly once
         catalog_provider = catalog.HERMES_ALIASES.get(provider, provider)
@@ -516,7 +535,7 @@ def _on_llm_request(request: Optional[Dict[str, Any]] = None, session_id: str = 
             with _LOCK:
                 turn["route_invalidated"] = True
                 turn.pop("effort", None)
-            _log({"kind": "route_effective", "mode": mode, "applied": False,
+            _log({**fields, "kind": "route_effective", "mode": mode, "applied": False,
                   "requested_model": outgoing, "effective_request_model": outgoing,
                   "provider": provider, "provider_identity": None,
                   "compatibility": "request_model_mismatch", "first_request": True,
@@ -556,12 +575,12 @@ def _on_llm_request(request: Optional[Dict[str, Any]] = None, session_id: str = 
             turn.pop("route_inflight", None)
             if (_TURNS.get(session_id or "-") is not turn or turn.get("route_invalidated")
                     or turn["route_binding"] != binding):
-                return _keep_routing_request(request, model, provider, mode, first_request, "routing_context_invalidated")
+                return _keep_routing_request(request, model, provider, mode, first_request, "routing_context_invalidated", fields)
             turn["decision"] = decision
         # The effort pick reads the same answers routing bought; route.decide now carries
         # them back on the decision, so no second Jev call is needed.
         route_answers = decision.get("answers")
-        entry = {"kind": "route", "mode": mode, "from": current, **{k: decision.get(k) for k in (
+        entry = {**fields, "kind": "route", "mode": mode, "from": current, **{k: decision.get(k) for k in (
             # has_images is logged so a reader can tell the vision pool from the general
             # one after the fact. Without it a model listed in both is unattributable, and
             # "is the specialty answer earning its keep?" cannot be answered from the log.
@@ -616,8 +635,8 @@ def _on_llm_request(request: Optional[Dict[str, Any]] = None, session_id: str = 
     with _LOCK:
         if (_TURNS.get(session_id or "-") is not turn or turn.get("route_invalidated")
                 or turn["route_binding"] != binding):
-            return _keep_routing_request(request, model, provider, mode, first_request, "routing_context_invalidated")
-        _log({"kind": "route_effective", "mode": mode, "applied": applied,
+            return _keep_routing_request(request, model, provider, mode, first_request, "routing_context_invalidated", fields)
+        _log({**fields, "kind": "route_effective", "mode": mode, "applied": applied,
               "provider": provider, "provider_identity": None if provider == "custom" else provider,
               "compatibility": "operator_assertion" if provider == "custom" and decision.get("routed")
                                else "router_provider_guard" if decision.get("routed") else "not_selected",

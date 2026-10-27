@@ -597,12 +597,42 @@ class DecisionLogTests(PluginCase):
         self.assertEqual(entry["tier"], "simple")
         self.assertNotIn("escalate", entry, "counting the key must count ladder decisions")
 
-    def test_the_log_never_holds_the_turn_text(self):
+    def test_the_log_holds_only_a_redacted_excerpt_of_the_turn(self):
         self.switch(routing="shadow")
+        long_turn = "Mail ann@example.com: " + TURN + " " + "tail-sentinel " * 40
         with self.decide_with(jev(3, stakes=0.9), self.cfg()):
-            self.turn(self.request())
+            plugin._on_pre_llm_call(session_id="s", turn_id="t1", user_message=long_turn)
+            plugin._on_llm_request(request=self.request(), session_id="s", turn_id="t1",
+                                   model=DEFAULT, provider="openrouter")
         raw = (self.home / "logs" / "jev-decisions.jsonl").read_text(encoding="utf-8")
-        self.assertNotIn("deadlocks", raw)
+        self.assertNotIn("ann@example.com", raw)
+        self.assertNotIn("tail-sentinel " * 20, raw, "only the first 200 characters are kept")
+        for entry in self.route_log() + [e for e in self.log() if e["kind"] == "route_effective"]:
+            self.assertIn("deadlocks", entry["task"])
+            self.assertLessEqual(len(entry["task"]), 200)
+            self.assertEqual(entry["lane"], "none")
+
+    def test_every_log_entry_carries_task_and_lane(self):
+        plugin._log({"kind": "screen", "status": "ok"})
+        entry = self.log()[-1]
+        self.assertIsNone(entry["task"], "an entry with no turn holds no text")
+        self.assertEqual(entry["lane"], "none")
+        plugin._log({"kind": "route", "lane": "jev-lane-small"})
+        self.assertEqual(self.log()[-1]["lane"], "jev-lane-small")
+
+    def test_a_sensitive_or_private_turn_logs_no_text(self):
+        self.switch(routing="shadow")
+        secret_turn = "deploy with OPENAI_API_KEY=sk-proj-abcdefghijklmnopqrstuvwx1234 now"
+        with self.decide_with(jev(1), self.cfg()):
+            plugin._on_pre_llm_call(session_id="s", turn_id="t1", user_message=secret_turn)
+            plugin._on_llm_request(request=self.request(), session_id="s", turn_id="t1",
+                                   model=DEFAULT, provider="openrouter")
+        raw = (self.home / "logs" / "jev-decisions.jsonl").read_text(encoding="utf-8")
+        self.assertNotIn("deploy", raw)
+        self.assertTrue(all(entry["task"] is None for entry in self.log()))
+        with mock.patch.object(plugin.route, "load_config",
+                               return_value={**plugin.route.DEFAULT_CONFIG, "private_profiles": ["default"]}):
+            self.assertIsNone(plugin._turn_fields(TURN)["task"])
 
 
 class SkillHookRootTests(PluginCase):

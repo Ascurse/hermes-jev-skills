@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add opt-in bounded pre-search source/query/time planning, code-first single-plan handling, and local URL grouping with original URLs, variant provenance and failed-versus-empty source accounting. `jev search` accepts `source_batches` and screens all variants before deduplicating; flagged, clipped or unread duplicates cannot hide behind a clean snippet. No new search engine, paid-source activation or provider setting changes.
+- Harden the opt-in browser runner with semantic checkbox/menu/select/scroll progress, explicit proposal/execution receipts, bounded stale/no-progress handling and completed/blocked/degraded outcomes. A matching title cannot override an execution error, host escape or exhausted budget. Close only the browser created by the runner, including in embedded execution.
+- Reject contradictory failure/fallback/drift metadata at the existing strict gate tiebreak boundary; leave host approvals and gate/routing modes unchanged. Document ecosystem reuse, existing model/effort regression coverage and code-first decision placement. Include offline fixtures and a real Chromium DOM smoke with synthetic decisions, no provider calls and blocked network egress.
+
 ## 0.25.1 (2026-10-23)
 
 Released by the daily Jev steward: 10 commit(s) on main since v0.25.0.

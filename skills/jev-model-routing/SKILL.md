@@ -103,6 +103,19 @@ On Hermes, `jev lane shadow` (from cron) classifies new Kanban cards and logs wh
 - Its three questions normally travel in the **same request** as skill selection's stage 1 (`jevkit/turn.py`), because Jev charges per request and not per question, and the connection underneath is pooled (a fresh TLS session per call used to be ~275 ms of the ~520 ms a decision cost). Measured live 2026-09-21/22: one question ~180-250 ms warm, and **1784 ms → 672 ms** per turn that needs both, 3 requests → 2. Each feature still reads its own answers through its own thresholds. `/jev merge_requests off` separates them again.
 - Jev down, slow (2.5 s budget) or malformed: current model, no delay beyond the budget. An answer that contradicts itself — a spread that does not cover the options, mass that does not sum to one, a chosen option that is not the maximum, a score that disagrees with its own distribution — is refused as `invalid_response` and lands here too.
 
+## Measure routing value, do not import quota claims
+
+Model-plus-effort selection already exists here; an external router is not a
+reason to add another per-call classifier or change live defaults. Preserve
+manual model/effort pins, session isolation, provider compatibility, disabled
+modes and the host's supported request shape. Run `tests/test_plugin_middleware.py`
+when changing this boundary. Historical replay and simulated token/quota savings
+are counterfactuals, not measured production savings or quality evidence. Count
+the selector, retries, fallbacks and final task verification in comparisons.
+Keep deterministic bookkeeping in code and choose Jev only for genuinely uncertain,
+prevalidated alternatives. Never use a model's approval or confidence to create
+spending, publication or credential authority.
+
 ## Tuning
 
 Decisions are logged without prompt text to `<hermes home>/logs/jev-decisions.jsonl`. Run in `shadow` for a day, read which tier real turns land in, then move models between pools. Change thresholds from your own traces, never from a hunch.

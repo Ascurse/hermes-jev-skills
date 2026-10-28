@@ -17,15 +17,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _decide_fakes import Scripted as _Scripted, TempHome  # noqa: E402
-
-# Политики lane и loop-step откалиброваны на jev-1.14.0; ответ другой версии ушёл бы в on_drift
-LANE_TUNED_MODEL = "jev-1.14.0"
-
-
-def Scripted(*args, **kwargs):
-    kwargs.setdefault("model", LANE_TUNED_MODEL)
-    return _Scripted(*args, **kwargs)
+from _decide_fakes import Scripted, TempHome  # noqa: E402
 from jevkit import lanes, policy as policies  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
@@ -287,8 +279,7 @@ class HermesShadow(TempHome):
             ("t_b", "Pinned card", "", "todo", "qa", now - 50, "gpt-6-astra", None),
             ("t_c", "Old card", "", "todo", "qa", now - 99_999, None, None),
         ])
-        # lane-kanban остаётся на jev-1.13.0
-        fake = _Scripted({"lane": "small", "security_sensitive": 0.05, "underspecified": 0.1})
+        fake = Scripted({"lane": "small", "security_sensitive": 0.05, "underspecified": 0.1})
         applied = []
         self.assertEqual(lane_shadow.tick(kanban_db=db, now=now, transport=fake,
                                           apply=lambda i, t: applied.append(i) or True)["mode"], "off")

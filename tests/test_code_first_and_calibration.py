@@ -30,7 +30,7 @@ from jevkit import cli_decide  # noqa: E402
 FIXTURES = HERE.parent / "evals" / "gate" / "fixtures.jsonl"
 
 CODE_FIRST = {
-    "name": "code-first", "version": 1, "tuned_on": "jev-1.13.0",
+    "name": "code-first", "version": 1, "tuned_on": "jev-1.14.0",
     "questions": {"worth": {"type": "noul", "instructions": "Is this worth a look?"}},
     "pre_rules": [
         {"then": "wake", "any": [["fact.source_failed", "==", True], ["fact.hours_quiet", ">=", 48]]},

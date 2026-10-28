@@ -28,7 +28,7 @@ class Decide(TempHome):
         self.assertEqual(out["action"], "retry")
         self.assertEqual(out["status"], "ok")
         self.assertFalse(out["fallback_used"])
-        self.assertEqual(out["jev_model"], "jev-1.13.0")
+        self.assertEqual(out["jev_model"], "jev-1.14.0")
         self.assertFalse(out["drift"])
         self.assertAlmostEqual(out["cost_usd"], 500 * 0.042 / 1e6)
         self.assertTrue(out["policy"].startswith("retry@1#"))
@@ -94,7 +94,7 @@ class Decide(TempHome):
         self.assertFalse(out["sent_to_jev"])
 
     def test_drift_takes_the_fallback_live_and_keeps_measuring_in_shadow(self):
-        fake = Scripted({"retry_helps": 0.05, "cause": "needs_person_or_access"}, model="jev-1.14.0")
+        fake = Scripted({"retry_helps": 0.05, "cause": "needs_person_or_access"}, model="jev-1.13.0")
         live = engine.decide(STATE, "retry", transport=fake)
         self.assertTrue(live["drift"])
         self.assertEqual(live["rule_action"], "hold_for_person")

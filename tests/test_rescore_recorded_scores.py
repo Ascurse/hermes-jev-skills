@@ -28,7 +28,7 @@ class RecordedScores(unittest.TestCase):
         with patch.object(client, 'ask', side_effect=AssertionError('no inference')):
             for answers in [self.raw, self.checked, json.loads(json.dumps(self.checked))]:
                 with self.subTest(answer_keys=list(answers['severity']['probabilities'])):
-                    result = decide.rescore(self.rules, answers, jev_model='jev-1.14.0', mode='shadow')
+                    result = decide.rescore(self.rules, answers, jev_model='jev-1.13.0', mode='shadow')
                     self.assertEqual(result['action'], expected)
                     self.assertTrue(result['drift'])
         self.assertEqual(self.checked, original, 'caller data must not be mutated')
@@ -50,10 +50,10 @@ class RecordedScores(unittest.TestCase):
                     decide.rescore(self.rules, answers, jev_model='jev-1.14.0', mode='shadow')
 
     def test_live_drift_still_uses_the_original_fallback(self):
-        result = decide.rescore(self.rules, self.checked, jev_model='jev-1.14.0', mode='live')
+        result = decide.rescore(self.rules, self.checked, jev_model='jev-1.13.0', mode='live')
         self.assertTrue(result['drift'])
         self.assertEqual(result['action'], self.rules['on_drift'])
-        self.assertEqual(self.rules['tuned_on'], 'jev-1.13.0')
+        self.assertEqual(self.rules['tuned_on'], 'jev-1.14.0')
 
     def test_score_without_spread_stays_unreported(self):
         answers = copy.deepcopy(self.checked)

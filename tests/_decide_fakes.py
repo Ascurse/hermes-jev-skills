@@ -32,7 +32,7 @@ class Scripted:
     `model` is the version the reply claims; `tokens` its input size.
     """
 
-    def __init__(self, values: Optional[Mapping[str, Any]] = None, *, model: Optional[str] = "jev-1.13.0",
+    def __init__(self, values: Optional[Mapping[str, Any]] = None, *, model: Optional[str] = "jev-1.14.0",
                  tokens: int = 500, confidence: float = 0.93, rest: float = 0.05, fail: Optional[str] = None) -> None:
         self.values = dict(values or {})
         self.model = model

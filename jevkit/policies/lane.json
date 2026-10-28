@@ -1,7 +1,7 @@
 {
   "name": "lane",
   "version": 1,
-  "tuned_on": "jev-1.13.0",
+  "tuned_on": "jev-1.14.0",
   "feature": "lanes",
   "description": "Initial lane for a piece of work: the smallest model and lowest effort that should still get it right. Lanes are small, medium, high and escalate; jevkit/lanes.py maps each to a real model and effort per host.",
   "code_first": {

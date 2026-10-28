@@ -2,7 +2,7 @@
   "name": "triage-urgency",
   "version": 1,
   "feature": "triage",
-  "tuned_on": "jev-1.13.0",
+  "tuned_on": "jev-1.14.0",
   "description": "The article's urgency rule, alone: escalate above 0.90, the normal queue below it. For any text a caller wants sorted by urgency.",
   "questions": {
     "urgency": {

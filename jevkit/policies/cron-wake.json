@@ -1,7 +1,7 @@
 {
   "name": "cron-wake",
   "version": 1,
-  "tuned_on": "jev-1.13.0",
+  "tuned_on": "jev-1.14.0",
   "feature": "cron_wake",
   "code_first": {
     "wake_without_jev": "pre-rules: the monitor's own source failed (fact.source_failed), or this is the job's first run (fact.first_run). Waking is what happens today, so these can cost a wake but never miss one",

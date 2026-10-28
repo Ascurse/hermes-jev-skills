@@ -1,7 +1,7 @@
 {
   "name": "gate-strict",
   "version": 1,
-  "tuned_on": "jev-1.13.0",
+  "tuned_on": "jev-1.14.0",
   "feature": "gate",
   "state_fields": [
     "tool",

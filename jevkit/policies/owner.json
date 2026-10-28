@@ -1,7 +1,7 @@
 {
   "name": "owner",
   "version": 1,
-  "tuned_on": "jev-1.13.0",
+  "tuned_on": "jev-1.14.0",
   "feature": "owner",
   "code_first": {
     "profile_exists": "refuse or fix an assignee that names no existing profile, with no Jev call at all"

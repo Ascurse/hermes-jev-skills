@@ -1,7 +1,7 @@
 {
   "name": "lane-kanban",
   "version": 1,
-  "tuned_on": "jev-1.13.0",
+  "tuned_on": "jev-1.14.0",
   "feature": "lanes",
   "description": "The lane policy for agent-sized work cards (a Hermes Kanban task is a whole job, not one edit). Same questions, so recorded answers rescore for free; thresholds calibrated on one fleet's 2,357 real tasks: Jev reads most cards as high with low confidence, and raising effort up front did not raise first-try success there.",
   "code_first": {

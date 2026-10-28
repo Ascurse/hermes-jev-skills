@@ -1,7 +1,7 @@
 {
   "name": "evaluator-default",
   "version": 1,
-  "tuned_on": "jev-1.13.0",
+  "tuned_on": "jev-1.14.0",
   "feature": "score",
   "_note": "The article's Step 6 thresholds as a reusable policy. Rubric levels are written per task; these are the defaults.",
   "questions": {

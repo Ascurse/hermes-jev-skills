@@ -1,7 +1,7 @@
 {
   "name": "retry",
   "version": 1,
-  "tuned_on": "jev-1.13.0",
+  "tuned_on": "jev-1.14.0",
   "feature": "retry",
   "code_first": {
     "respawn_guard": "pre-rule: a rate-limit or auth failure (fact.rate_limited_or_auth) goes to the existing respawn guard; Jev is not asked",

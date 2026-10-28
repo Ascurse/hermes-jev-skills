@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from . import __version__, catalog, choose, cli_decide, cli_lane, client, compact, key_setup, keystore, ladder, mailbox, memo, plan, rerank, replay, route, search, skillpick, spend, supervise, triage
+from . import __version__, catalog, choose, cli_decide, cli_lane, client, compact, key_setup, keystore, ladder, mailbox, memo, plan, policy, rerank, replay, route, search, skillpick, spend, supervise, triage
 
 
 def _stdin_json() -> Any:
@@ -222,6 +222,16 @@ def _override_endpoint() -> Optional[Dict[str, Any]]:
             "bearer": client.PROXY_KEY_ENV if client._proxy_key() else None}
 
 
+def _policy_drift_warnings(model: Optional[str]) -> List[str]:
+    """Policies whose tuned_on version ``model`` does not match: their live decisions all fall back."""
+    drifted = sorted(name for name in policy.shipped_names()
+                     if policy.drifted(policy.load(name).get("tuned_on"), model))
+    if not drifted:
+        return []
+    return [f"{model} does not match the version these policies were tuned on, so every live "
+            f"decision from them takes its on_drift fallback: {', '.join(drifted)}."]
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     report: Dict[str, Any] = {"version": __version__, "key": keystore.describe()}
     override = _override_endpoint()
@@ -233,7 +243,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         try:
             reply = client.ask("The build finished and all tests passed.",
                                {"ok": client.noul("The text reports a successful outcome")}, timeout=10)
-            report["jev"] = {"reachable": True, "latency_ms": reply["latency_ms"]}
+            report["jev"] = {"reachable": True, "latency_ms": reply["latency_ms"], "model": reply.get("jev_model")}
         except client.JevError as error:
             report["jev"] = {"reachable": False, "error": error.code}
     config = route.load_config()
@@ -256,6 +266,11 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     report["routing"].update({k: v for k, v in by_profile.items() if k != "profile_warnings"})
     if by_profile.get("profile_warnings"):
         report["routing"]["warnings"] = report["routing"].get("warnings", []) + by_profile["profile_warnings"]
+    # Модель из живого ответа точнее: провайдер может отвечать не той версией, что в его id
+    model = report.get("jev", {}).get("model") or client._provider_model(keystore.provider())
+    drift = _policy_drift_warnings(model)
+    if drift:
+        report["policies"] = {"model": model, "warnings": drift}
     report["hermes_home"] = str(catalog.hermes_home()) if catalog.hermes_home().is_dir() else None
     _out(report)
     # Only a missing key fails doctor. The routing findings are warnings about cost: an
